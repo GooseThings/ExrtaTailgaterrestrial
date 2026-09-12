@@ -1,0 +1,126 @@
+:root {
+  color-scheme: light dark;
+  --bg: #1e1e2e;
+  --panel: #313244;
+  --text: #cdd6f4;
+  --accent: #89b4fa;
+  --good: #a6e3a1;
+  --bad: #f38ba8;
+  --warn: #f9e2af;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid #45475a;
+}
+
+h1 { font-size: 1.2rem; margin: 0; }
+
+#connection-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+input, select, button {
+  font-size: 0.95rem;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid #45475a;
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:hover { background: #45475a; }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.status-pill {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+}
+.status-pill.connected { background: rgba(166,227,161,0.2); color: var(--good); }
+.status-pill.disconnected { background: rgba(243,139,168,0.2); color: var(--bad); }
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  padding: 12px 20px 0;
+}
+
+.tab-btn {
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  padding: 8px 16px;
+  color: var(--text);
+}
+
+.tab-btn.active {
+  border-bottom-color: var(--accent);
+  color: var(--accent);
+}
+
+main { padding: 20px; }
+
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+.panel-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 320px) 1fr;
+  gap: 20px;
+}
+
+@media (max-width: 700px) {
+  .panel-grid { grid-template-columns: 1fr; }
+}
+
+#scan-form label {
+  display: block;
+  margin-bottom: 10px;
+}
+
+#scan-form input, #scan-form select { width: 100%; margin-top: 4px; }
+
+.button-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 12px 0;
+}
+
+.preview img, #rendered-image {
+  max-width: 100%;
+  border: 1px solid #45475a;
+  border-radius: 6px;
+  background: #11111b;
+}
+
+#scan-log {
+  max-height: 240px;
+  overflow-y: auto;
+  background: #11111b;
+  padding: 10px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+}
+
+#satellite-select { width: 100%; }
