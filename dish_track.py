@@ -10,7 +10,7 @@
 import serial
 import threading
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import ttk, messagebox
 import requests
 
 from skyfield.api import load, EarthSatellite, wgs84
@@ -34,8 +34,14 @@ UPDATE_INTERVAL = 2.0
 AZ_THRESHOLD = 1.0
 EL_THRESHOLD = 1.0
 
-CELESTRAK_SOURCES = {
-    "Active Satellites": "https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=tle",
+# Plain-text TLE sources (name/line1/line2 triples) — all parsed the same way
+# by fetch_tle_catalogue(), so adding another provider is just another entry.
+# Celestrak is the biggest catalogue, but it does go down sometimes; AMSAT is
+# a solid fallback (amateur/ham satellites only, but that's usually exactly
+# what you want to track anyway).
+TLE_SOURCES = {
+    "Celestrak - Active Satellites": "https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=tle",
+    "AMSAT - Amateur Satellites": "https://amsat.org/tle/current/nasabare.txt",
 }
 
 # ─────────────────────────────────────────────────────────────────
@@ -176,6 +182,11 @@ class TrackerApp(tk.Tk):
         self._build()
 
     def _build(self):
+        self.source_var = tk.StringVar(value=list(TLE_SOURCES.keys())[0])
+        source_menu = ttk.Combobox(self, textvariable=self.source_var,
+                                    values=list(TLE_SOURCES.keys()), state="readonly")
+        source_menu.pack(fill="x")
+
         self.listbox = tk.Listbox(self)
         self.listbox.pack(fill="both", expand=True)
 
@@ -188,7 +199,12 @@ class TrackerApp(tk.Tk):
         self.status.pack()
 
     def load(self):
-        sats = fetch_tle_catalogue(list(CELESTRAK_SOURCES.values())[0])
+        url = TLE_SOURCES[self.source_var.get()]
+        try:
+            sats = fetch_tle_catalogue(url)
+        except requests.RequestException as e:
+            messagebox.showerror("Download Failed", str(e))
+            return
         self.satellites = sats
 
         self.listbox.delete(0, tk.END)

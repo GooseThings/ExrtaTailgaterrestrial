@@ -129,10 +129,26 @@ $("render-btn").addEventListener("click", () => {
 
 // ── Track ────────────────────────────────────────────────────────
 
+async function loadTleSources() {
+  const { sources } = await api("/api/track/sources");
+  const select = $("tle-source-select");
+  select.replaceChildren();
+  sources.forEach((name) => {
+    const opt = document.createElement("option");
+    opt.value = name;
+    opt.textContent = name;
+    select.appendChild(opt);
+  });
+}
+
 $("load-tles-btn").addEventListener("click", async () => {
   $("load-tles-btn").disabled = true;
   try {
-    const { satellites } = await api("/api/track/load", { method: "POST" });
+    const { satellites } = await api("/api/track/load", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ source: $("tle-source-select").value }),
+    });
     const select = $("satellite-select");
     select.replaceChildren();
     satellites.forEach((name, i) => {
@@ -196,3 +212,4 @@ setInterval(refreshStatus, 1500);
 refreshStatus();
 refreshFiles();
 updateEstimate();
+loadTleSources();

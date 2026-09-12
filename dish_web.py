@@ -369,9 +369,17 @@ def api_image():
 # TRACK
 # ────────────────────────────────────────────────────────────────
 
+@app.route("/api/track/sources")
+def api_track_sources():
+    return jsonify({"sources": list(dish_track.TLE_SOURCES.keys())})
+
+
 @app.route("/api/track/load", methods=["POST"])
 def api_track_load():
-    url = list(dish_track.CELESTRAK_SOURCES.values())[0]
+    source = (request.json or {}).get("source", list(dish_track.TLE_SOURCES.keys())[0])
+    if source not in dish_track.TLE_SOURCES:
+        return jsonify({"ok": False, "error": "Unknown source."}), 400
+    url = dish_track.TLE_SOURCES[source]
     try:
         sats = dish_track.fetch_tle_catalogue(url)
     except Exception as e:

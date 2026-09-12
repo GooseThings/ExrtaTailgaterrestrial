@@ -109,10 +109,15 @@ help pull detail out of noisy scans.
 python3 dish_track.py
 ```
 
-A small GUI: click **Load** to pull the current active-satellite TLE catalogue from Celestrak,
+A small GUI: pick a TLE source from the dropdown (Celestrak's active-satellite catalogue, or AMSAT's
+amateur-satellite list if Celestrak is down or you're only after ham birds), click **Load**,
 **Connect** to open the dish's serial port, select a satellite, then **Track**. The dish will
 command `azangle`/`elangle` to follow it across the sky, waiting and auto-starting if the
 satellite is currently below the horizon.
+
+Add more sources by editing `TLE_SOURCES` at the top of the file — any plain-text TLE feed
+(name/line1/line2 triples) works without further changes, since `fetch_tle_catalogue()` parses
+that format generically.
 
 Edit these constants at the top of the file for your setup:
 
