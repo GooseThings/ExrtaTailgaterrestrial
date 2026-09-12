@@ -1,4 +1,4 @@
-#Package requirements for dish_scan.py, dish_image.py, and dish_track.py
+#Package requirements for dish_scan.py, dish_image.py, dish_track.py, and dish_web.py
 
 numpy
 pyserial
@@ -6,5 +6,7 @@ regex
 matplotlib
 requests
 skyfield
+pillow
+flask
 
 

@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ExtraTailgaterrestrial</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header>
+    <h1>🛰 ExtraTailgaterrestrial</h1>
+    <div id="connection-bar">
+      <input id="port" type="text" value="/dev/ttyACM0" placeholder="Serial port">
+      <button id="connect-btn">Connect</button>
+      <span id="conn-status" class="status-pill disconnected">Disconnected</span>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="scan">Scan</button>
+    <button class="tab-btn" data-tab="view">View Image</button>
+    <button class="tab-btn" data-tab="track">Track</button>
+  </nav>
+
+  <main>
+    <section id="tab-scan" class="tab-panel active">
+      <div class="panel-grid">
+        <form id="scan-form">
+          <label>Azimuth start <input type="number" id="az_start" value="90" min="0" max="360"></label>
+          <label>Azimuth end <input type="number" id="az_end" value="270" min="0" max="360"></label>
+          <label>Elevation start <input type="number" id="el_start" value="5" min="5" max="70"></label>
+          <label>Elevation end <input type="number" id="el_end" value="70" min="5" max="70"></label>
+          <label>Resolution
+            <select id="resolution">
+              <option value="1">Low (azangle/elangle)</option>
+              <option value="2">High (nudge)</option>
+            </select>
+          </label>
+          <div id="estimate"></div>
+          <div class="button-row">
+            <button type="button" id="scan-start-btn">Start Scan</button>
+            <button type="button" id="scan-stop-btn" disabled>Stop</button>
+          </div>
+        </form>
+        <div class="preview">
+          <img id="scan-preview" alt="Scan preview" hidden>
+          <pre id="scan-log"></pre>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-view" class="tab-panel">
+      <div class="button-row">
+        <select id="file-select"></select>
+        <button id="refresh-files-btn">Refresh</button>
+        <label>Interpolation
+          <input type="number" id="interp-factor" value="4" min="1" max="8">
+        </label>
+        <button id="render-btn">Render</button>
+      </div>
+      <img id="rendered-image" alt="Rendered heatmap" hidden>
+    </section>
+
+    <section id="tab-track" class="tab-panel">
+      <div class="button-row">
+        <button id="load-tles-btn">Load Satellites</button>
+        <select id="satellite-select" size="10"></select>
+      </div>
+      <div class="button-row">
+        <button id="track-start-btn">Start Tracking</button>
+        <button id="track-stop-btn" disabled>Stop</button>
+      </div>
+      <div id="track-status" class="status-pill">Not tracking</div>
+    </section>
+  </main>
+
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
