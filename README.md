@@ -1,8 +1,13 @@
  # Microwave RF Imaging & Tracking with a Portable "Tailgater" Satellite Antenna
 
-Gabe Emerson / Saveitforparts, 2023
+Originally created by Gabe Emerson / Saveitforparts (2023) — his [video demo](https://youtu.be/lVOTZxNCgTM)
+explains the original concept and the hardware reverse-engineering that made this possible.
 
-Video demo: https://youtu.be/lVOTZxNCgTM
+This fork is actively maintained by Goose ([N8GMZ](http://github.com/GooseThings/)). What started as a couple
+of small fixes has grown into a real-time satellite tracker, a rebuilt imaging pipeline with interpolation,
+and ongoing work on a browser-based control panel — so at this point consider it a continuation of Gabe's
+original project rather than a lightly-patched copy. Full credit to Gabe for the original scanning code and
+for figuring out the Tailgater's serial protocol in the first place; none of this exists without that work.
 
 
  ## **Introduction:**
@@ -15,12 +20,11 @@ hardware will be in the Ku band (~11ghz)
 
  - Added 3/27/2026 - dish_track.py will track a satellite across the sky using Keppler data pulled from the internet.
 
-Please note that the author is not an expert in Python, Linux, satellites, or 
-radio theory! This code is very experimental, amateur, and not optimized. It will
-likely void any warranty your Tailgater antenna may have. There are probably better,
-faster, and more efficient ways	to do some of the functions and calculations in 
-the code. Please feel free to fix, improve, or add to anything (If you do, I'd
-love to hear what you did and how it worked!)    
+Please note that neither the original author nor the current maintainer are experts in Python, Linux,
+satellites, or radio theory! This code is still experimental and amateur, and it will likely void any
+warranty your Tailgater antenna may have. There are probably better, faster, and more efficient ways to do
+some of the functions and calculations in the code. Feel free to fix, improve, or add to anything — pull
+requests and issues are welcome.
 
 
  ## **Applications:**
@@ -38,14 +42,14 @@ This code has been developed and tested with a Dish Network "Tailgater" portable
 satellite antenna. Specifically, a 2014 version in an octagonal-ish enclosure 
 with a USB "A" connector on the mainboard (located inside the enclosure, behind 
 the dish reflector). There are many variations, models, and versions of this 
-antenna, including Wallace, VuQube, Dish, King Controls, etc. I have not found a
-consistent model numbering scheme, so I don't know how to identify the correct 
-model without opening the top and looking for a USB port. Other models have mini-USB
-or other ports, and some appear to have jumpers for 9-pin serial. While I have
-partially tested this code on a 2011 version with mini-USB port, and had some success,
-I have not fully tested it on anything but the 2014 USB-A version. 
+antenna, including Wallace, VuQube, Dish, King Controls, etc. There isn't a
+consistent model numbering scheme, so the easiest way to identify the correct 
+model is by opening the top and looking for a USB port. Other models have mini-USB
+or other ports, and some appear to have jumpers for 9-pin serial. Gabe's original
+testing covered a 2011 version with a mini-USB port (partial success) and a 2014
+USB-A version (fully tested).
 
-My test unit uses firmware version "pragelato.h 704 2013-08-09 03:41:27Z rudrava"
+Gabe's original test unit uses firmware version "pragelato.h 704 2013-08-09 03:41:27Z rudrava".
 Other versions may have different console commands available. For example, the 2011
 firmware does not seem to include "azangle". To use such a system, you will need to
 replace any "azangle" commands with a series of "aznudge" or "azim" commands. 
@@ -79,9 +83,9 @@ You can check for proper connection by running "lsusb" on Linux. The dish should
 up as "Microchip Technology, Inc. CDC RS-232 Emulation Demo".
 
 Run "dmesg | grep tty" to see which port the dish is using. This is usually something
-like /dev/ttyACM0, although I have seen it jump to ttyACM1 or ACM2 if the power or USB
+like /dev/ttyACM0, although it can jump to ttyACM1 or ACM2 if the power or USB
 connection are interrupted. If your Tailgater is NOT on /dev/ttyACM0 you will need to 
-edit line 15 of dish_scan.py to reflect the correct port. 
+edit the `port=` line near the top of dish_scan.py to reflect the correct port. 
 	
 To connect to the serial console on the dish, run "screen /dev/ttyACM0" (or appropriate
 port) on Linux, or use a Windows serial terminal to connect to the usb device (typically
@@ -103,8 +107,8 @@ This is technically "backwards" from a standard compass heading. The code is wri
 take this into account, but please note that image and array outputs will show azimuth in
 the dish's reference plane, opposite of standard compass or orbital azimuth. 
 		
-Generally I place the dish with the coax connector facing due North (for scans of the
-Southern sky), but you can place it in any orientation you want. The dish scans left to
+A common setup is to place the dish with the coax connector facing due North (for scans of
+the Southern sky), but you can place it in any orientation you want. The dish scans left to
 right, incrementing up from the starting elevation. Remember the coordinate system is
 "backwards" compared to standard compass headings.  
 
@@ -155,7 +159,7 @@ heatmap of the scan in a new window. You can save this heatmap for later use.
 
 
  ## **Example Images:**
-I have included several example images to show what a scan looks like:
+A few example images are included to show what a scan looks like:
 	 
 - "dish_image example.png"  The result of running a default scan with dish_scan.py and 
 processing with dish_image.py. Shows geostationary TV satellites.
@@ -176,7 +180,7 @@ light, and 50% overlay of each.
 
  ## **Example Files**
 
-I have included some example data files output by dish_scan.py, for processing with dish_image.py
+A few example data files output by dish_scan.py are included, for processing with dish_image.py
 
 - "raw-data-20230321-193653.txt":   numpy matrix of signal strength at each azimuth and elevation pair
 
@@ -194,17 +198,19 @@ using it. High-res scans of smaller areas seem to have fewer errors. Scans of ve
 areas using the high-res scan may cause undue wear to your dish motors, as well as taking
 a very long time to complete. 
 
-Originally I indexed backwards on alternate elevations, allowing the dish to pan back and forth. 
-Unfortunately, this caused indexing and gear meshing issues that led to distorted images. Since
-I was unable to fix this without massaging the output array, I've made the dish return to the 
-starting azimuth for each elevation. This adds a little extra time to the overall scan duration.
+The scan loop indexes forward on every elevation and returns the dish to the starting azimuth
+between rows, rather than panning back and forth on alternate elevations. An earlier version
+alternated direction to save time, but that caused indexing and gear-meshing issues that
+distorted the resulting images. Always returning to the starting azimuth adds a little extra
+time to the overall scan, but keeps the image clean.
 
-The heatmap generated by dish_image.py uses CMRmap. If you wish to use another colormap, you can
-change line 67 of dish_image.py. I also like "seismic" and "gnuplot2", but I feel that they lose
-some definition on the background landscape. "hsv" may also be useful for noisy scans. 
+The heatmap generated by dish_image.py uses the "inferno" colormap. If you wish to use another
+colormap, change the `cmap=` argument in the `plt.imshow(...)` call near the bottom of the file.
+"seismic" and "gnuplot2" also work well, though they can lose some definition on the background
+landscape. "hsv" may also be useful for noisy scans. 
 	
-If you use this code and encounter any problems, feel free to email me at the address at the top
-of this file. However, I may have to refer back to this myself to remember how it works! 
+If you run into problems with this code, please open an issue on this repo rather than emailing —
+it's much easier to track and follow up on.
 
  # dish_track.py
  This script will let you pick a satellite to track in real time.
@@ -230,5 +236,3 @@ OBSERVER_LAT = 42.87           # your latitude
 OBSERVER_LON = -85.68          # your longitude
 UPDATE_INTERVAL = 2.0          # seconds between dish position updates
 ```
-
- 
