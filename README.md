@@ -218,15 +218,14 @@ pip install pyserial (If you haven't already installed it for dish_scan.py)
  ## How to use it:
 
  - Run ```python3 dish_track.py```
- - Download TLEs — pick a catalogue (Space Stations, Amateur, Weather, etc.) and hit "Download TLEs". It fetches live data straight from Celestrak.
- - Connect the dish — enter your serial port (default /dev/ttyACM0) and click "Connect Dish"
- - Find your satellite — use the filter box to search by name (e.g. type "ISS" or "NOAA")
- - Preview the pass — click "Preview Pass" to see a table of where the satellite will be over the next 90 minutes
- - Start Tracking — click "▶ Start Tracking" and the dish will begin commanding azangle/elangle over serial every 2 seconds, following the satellite across the sky. If the satellite is below the horizon it waits and starts moving the dish automatically when it rises.
+ - Click "Load" to fetch the current active-satellite TLE catalogue from Celestrak
+ - Click "Connect" to open the dish's serial port (edit SERIAL_PORT below if it's not /dev/ttyACM0)
+ - Select a satellite from the list and click "Track" — the dish will begin commanding azangle/elangle over serial, following the satellite across the sky. If the satellite is below the horizon it waits and starts moving the dish automatically when it rises.
+ - Click "Stop" to stop tracking
 
  ## Key things to edit at the top of the file:
 ```
-pythonSERIAL_PORT  = '/dev/ttyACM0'  # your dish port
+SERIAL_PORT  = '/dev/ttyACM0'  # your dish port
 OBSERVER_LAT = 42.87           # your latitude
 OBSERVER_LON = -85.68          # your longitude
 UPDATE_INTERVAL = 2.0          # seconds between dish position updates

@@ -4,14 +4,13 @@
 #
 # Downloads TLE data from Celestrak, lets you pick a satellite from a GUI, then drives the dish motors over serial to follow the satellite in real time.
 #
-# Requirements: pip install skyfield pyserial pillow requests tkinter
+# Requirements: pip install skyfield pyserial requests
 #
 # Usage: python3 dish_track.py
 import serial
-import time
 import threading
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import messagebox
 import requests
 
 from skyfield.api import load, EarthSatellite, wgs84
@@ -36,7 +35,7 @@ AZ_THRESHOLD = 1.0
 EL_THRESHOLD = 1.0
 
 CELESTRAK_SOURCES = {
-    "Active Satellites": "https://celestrak.org/SOCRATES/query.php?CATALOG=active&FORMAT=TLE",
+    "Active Satellites": "https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=tle",
 }
 
 # ─────────────────────────────────────────────────────────────────
@@ -197,7 +196,14 @@ class TrackerApp(tk.Tk):
             self.listbox.insert(tk.END, f"{i}: {name}")
 
     def connect(self):
-        self.dish = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1)
+        if self.dish and self.dish.is_open:
+            self.dish.close()
+        try:
+            self.dish = serial.Serial(SERIAL_PORT, BAUD_RATE, timeout=1)
+        except serial.SerialException as e:
+            self.dish = None
+            messagebox.showerror("Serial Error", str(e))
+            return
         self.status.config(text="Connected")
 
     def track(self):
