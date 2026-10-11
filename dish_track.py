@@ -13,6 +13,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import requests
 
+import dish_motion
 from skyfield.api import load, EarthSatellite, wgs84
 
 # ─────────────────────────────────────────────────────────────────
@@ -53,15 +54,6 @@ def send_command(dish, text):
     cmd = (text + '\r').encode()
     dish.write(cmd)
     dish.flush()
-
-
-def send_azangle(dish, degrees):
-    send_command(dish, f"azangle {int(degrees)}")
-
-
-def send_elangle(dish, degrees):
-    degrees = max(MIN_ELEVATION, min(MAX_ELEVATION, int(degrees)))
-    send_command(dish, f"elangle {int(degrees)}")
 
 
 def dish_az_from_compass(compass_az):
@@ -114,12 +106,17 @@ class SatelliteTracker:
 # ─────────────────────────────────────────────────────────────────
 
 class TrackingThread(threading.Thread):
-    def __init__(self, tracker, dish, callback):
+    def __init__(self, tracker, dish, callback,
+                 step_size=None, tolerance=None, on_warning=None):
         super().__init__(daemon=True)
         self.tracker = tracker
         self.dish = dish
         self.callback = callback
         self.stop_event = threading.Event()
+
+        self.step_size = step_size or dish_motion.DEFAULT_STEP_SIZE
+        self.tolerance = tolerance or dish_motion.DEFAULT_TOLERANCE
+        self.on_warning = on_warning
 
         self.prev_az = None
         self.prev_el = None
@@ -144,8 +141,20 @@ class TrackingThread(threading.Thread):
                             move = True
 
                     if move:
-                        send_azangle(self.dish, dish_az)
-                        send_elangle(self.dish, el)
+                        az_unknown = self.prev_az is None
+                        el_unknown = self.prev_el is None
+                        az_current = dish_az if az_unknown else self.prev_az
+                        el_current = el if el_unknown else self.prev_el
+                        dish_motion.stepped_move(
+                            self.dish, 'az', az_current, dish_az,
+                            step_size=self.step_size, tolerance=self.tolerance,
+                            on_warning=self.on_warning, force=az_unknown,
+                        )
+                        dish_motion.stepped_move(
+                            self.dish, 'el', el_current, el,
+                            step_size=self.step_size, tolerance=self.tolerance,
+                            on_warning=self.on_warning, force=el_unknown,
+                        )
                         self.prev_az = dish_az
                         self.prev_el = el
 

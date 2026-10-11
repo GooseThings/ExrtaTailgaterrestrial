@@ -20,6 +20,7 @@ from flask import Flask, jsonify, request, send_file, render_template
 from PIL import Image
 
 import dish_image
+import dish_motion
 import dish_track
 
 app = Flask(__name__)
@@ -58,6 +59,13 @@ state = {
         "message": "Not tracking",
         "below_horizon": False,
     },
+
+    "motion": {
+        "step_size": dish_motion.DEFAULT_STEP_SIZE,
+        "tolerance": dish_motion.DEFAULT_TOLERANCE,
+        "warnings": [],
+        "position": {"az": None, "el": None},
+    },
 }
 
 
@@ -65,6 +73,53 @@ def log_scan(message):
     log = state["scan"]["log"]
     log.append(message)
     del log[:-200]  # keep the last 200 lines
+
+
+# ────────────────────────────────────────────────────────────────
+# MOTION (stepped/verified moves + slip warnings)
+# ────────────────────────────────────────────────────────────────
+
+def _record_motion_warning(warning):
+    with state_lock:
+        warnings = state["motion"]["warnings"]
+        warnings.append(warning)
+        del warnings[:-50]  # keep the last 50
+
+
+def _safe_move(dish, axis, target_deg):
+    """Stepped, verified move using the current motion settings. Falls back
+    to a single direct, forced move when an axis's position is unknown
+    (e.g. right after a server restart), rather than assuming we're
+    already there."""
+    with state_lock:
+        step_size = state["motion"]["step_size"]
+        tolerance = state["motion"]["tolerance"]
+        current = state["motion"]["position"].get(axis)
+
+    unknown = current is None
+    if unknown:
+        current = target_deg
+
+    achieved = dish_motion.stepped_move(
+        dish, axis, current, target_deg,
+        step_size=step_size, tolerance=tolerance,
+        on_warning=_record_motion_warning,
+        force=unknown,
+    )
+
+    with state_lock:
+        state["motion"]["position"][axis] = achieved
+    return achieved
+
+
+def _verify_position(dish, axis, expected_deg):
+    """Re-affirm position at a serpentine direction-reversal point."""
+    with state_lock:
+        tolerance = state["motion"]["tolerance"]
+    return dish_motion.verify_position(
+        dish, axis, expected_deg, tolerance=tolerance,
+        on_warning=_record_motion_warning,
+    )
 
 
 # ────────────────────────────────────────────────────────────────
@@ -104,12 +159,68 @@ def read_signal_strength(dish, stop_event):
 def api_status():
     with state_lock:
         dish = state["dish"]
+        now = time.time()
+        warnings = state["motion"]["warnings"]
+        recent = [w for w in warnings if now - w["time"] < 15]
         return jsonify({
             "connected": bool(dish and dish.is_open),
             "port": state["port"],
             "scan": {k: v for k, v in state["scan"].items() if k != "log"},
             "track": state["track"],
+            "motion": {
+                "step_size": state["motion"]["step_size"],
+                "tolerance": state["motion"]["tolerance"],
+                "slip_active": bool(recent),
+                "warnings": list(warnings[-20:]),
+            },
         })
+
+
+@app.route("/api/motion/settings", methods=["GET", "POST"])
+def api_motion_settings():
+    if request.method == "POST":
+        p = request.json or {}
+        with state_lock:
+            if "step_size" in p:
+                state["motion"]["step_size"] = max(1.0, min(45.0, float(p["step_size"])))
+            if "tolerance" in p:
+                state["motion"]["tolerance"] = max(5, min(500, int(p["tolerance"])))
+    with state_lock:
+        return jsonify({
+            "step_size": state["motion"]["step_size"],
+            "tolerance": state["motion"]["tolerance"],
+        })
+
+
+@app.route("/api/motion/clear", methods=["POST"])
+def api_motion_clear():
+    with state_lock:
+        state["motion"]["warnings"] = []
+    return jsonify({"ok": True})
+
+
+@app.route("/api/move", methods=["POST"])
+def api_move():
+    p = request.json or {}
+    axis = p.get("axis")
+    if axis not in ("az", "el"):
+        return jsonify({"ok": False, "error": "axis must be 'az' or 'el'"}), 400
+    try:
+        target = float(p["degrees"])
+    except (KeyError, ValueError, TypeError):
+        return jsonify({"ok": False, "error": "degrees required"}), 400
+
+    with state_lock:
+        dish = state["dish"]
+        if not dish or not dish.is_open:
+            return jsonify({"ok": False, "error": "Connect to the dish first."}), 400
+        if state["scan"]["running"]:
+            return jsonify({"ok": False, "error": "A scan is running."}), 400
+        if state["track"]["running"]:
+            return jsonify({"ok": False, "error": "Tracking is running."}), 400
+
+    achieved = _safe_move(dish, axis, target)
+    return jsonify({"ok": True, "target_deg": achieved})
 
 
 @app.route("/api/connect", methods=["POST"])
@@ -240,23 +351,28 @@ def _run_scan(dish, az_start, az_end, el_start, el_end, resolution, stop_event):
         sky_data = np.zeros((el_range + 1, az_range + 1))
 
         log_scan("Moving dish to starting position...")
-        send_command(dish, f"azangle {az_start}")
-        time.sleep(10)
-        dish.flush()
-        dish.reset_output_buffer()
-        send_command(dish, f"elangle {el_start}")
-        dish.flush()
-        dish.reset_output_buffer()
-        dish.reset_input_buffer()
-        time.sleep(10)
+        _safe_move(dish, 'az', az_start)
+        _safe_move(dish, 'el', el_start)
 
         state["scan"]["total"] = (el_range) * (az_range)
 
         if resolution == 1:
+            ascending = True
             for elevation in range(el_start, el_end):
                 if stop_event.is_set():
                     break
-                for azimuth in range(az_start, az_end):
+                if elevation != el_start:
+                    send_command(dish, f"elangle {elevation}")
+                    time.sleep(2)
+
+                if ascending:
+                    az_sequence = range(az_start, az_end)
+                    row_end_az = az_end - 1
+                else:
+                    az_sequence = range(az_end - 1, az_start - 1, -1)
+                    row_end_az = az_start
+
+                for azimuth in az_sequence:
                     if stop_event.is_set():
                         break
                     send_command(dish, f"azangle {azimuth}")
@@ -266,10 +382,12 @@ def _run_scan(dish, az_start, az_end, el_start, el_end, resolution, stop_event):
                     _record_point(sky_data, pixels, sky_image, timestr,
                                    abs(elevation - el_end), abs(azimuth - az_end), signal_strength,
                                    azimuth, elevation)
-                send_command(dish, f"azangle {az_start}")
-                wait_time = int((az_range) * 0.05) + 1
-                time.sleep(wait_time)
-                send_command(dish, f"elangle {elevation}")
+
+                # Direction is about to reverse - this is where gear lash on a
+                # worn drivetrain is most likely to introduce slip, so verify
+                # instead of trusting the last sweep command landed cleanly.
+                _verify_position(dish, 'az', row_end_az)
+                ascending = not ascending
         else:
             for elevation in range(0, el_range):
                 if stop_event.is_set():
@@ -284,9 +402,7 @@ def _run_scan(dish, az_start, az_end, el_start, el_end, resolution, stop_event):
                     _record_point(sky_data, pixels, sky_image, timestr,
                                    abs(elevation - el_range), abs(azimuth - az_range), signal_strength,
                                    azimuth, elevation)
-                send_command(dish, f"azangle {az_start}")
-                wait_time = int((az_range / 5) * 0.05) + 1
-                time.sleep(wait_time)
+                _safe_move(dish, 'az', az_start)
                 send_command(dish, "elnudge up")
 
         state["scan"]["last_file"] = f"raw-data-{timestr}.txt"
@@ -407,9 +523,15 @@ def api_track_start():
 
         _stop_track_locked()
 
+        step_size = state["motion"]["step_size"]
+        tolerance = state["motion"]["tolerance"]
+
         name, l1, l2 = state["satellites"][idx]
         tracker = dish_track.SatelliteTracker(name, l1, l2, dish_track.OBSERVER_LAT, dish_track.OBSERVER_LON)
-        thread = dish_track.TrackingThread(tracker, dish, _track_callback)
+        thread = dish_track.TrackingThread(
+            tracker, dish, _track_callback,
+            step_size=step_size, tolerance=tolerance, on_warning=_record_motion_warning,
+        )
         state["track_thread"] = thread
         state["track"]["running"] = True
         thread.start()

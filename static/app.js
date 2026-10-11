@@ -180,6 +180,52 @@ $("track-start-btn").addEventListener("click", async () => {
 
 $("track-stop-btn").addEventListener("click", () => api("/api/track/stop", { method: "POST" }));
 
+// ── Motion monitor ───────────────────────────────────────────────
+
+async function loadMotionSettings() {
+  try {
+    const { step_size, tolerance } = await api("/api/motion/settings");
+    $("step-size").value = step_size;
+    $("move-tolerance").value = tolerance;
+  } catch (e) {
+    /* ignore */
+  }
+}
+
+async function saveMotionSettings() {
+  try {
+    await api("/api/motion/settings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        step_size: $("step-size").value,
+        tolerance: $("move-tolerance").value,
+      }),
+    });
+  } catch (e) {
+    /* ignore */
+  }
+}
+
+$("step-size").addEventListener("change", saveMotionSettings);
+$("move-tolerance").addEventListener("change", saveMotionSettings);
+
+$("clear-warnings-btn").addEventListener("click", () => api("/api/motion/clear", { method: "POST" }));
+
+function updateSlipBadge(motion) {
+  const badge = $("slip-badge");
+  if (motion.slip_active) {
+    const last = motion.warnings[motion.warnings.length - 1];
+    badge.textContent = `Movement warning: ${last.axis} target ${last.target_deg}° off by ${last.diff} counts`;
+    badge.classList.remove("disconnected");
+    badge.classList.add("warning");
+  } else {
+    badge.textContent = "No movement warnings";
+    badge.classList.remove("warning");
+    badge.classList.remove("disconnected");
+  }
+}
+
 // ── Status polling ───────────────────────────────────────────────
 
 async function refreshStatus() {
@@ -206,6 +252,8 @@ async function refreshStatus() {
   trackPill.textContent = status.track.message;
   trackPill.classList.toggle("connected", status.track.running && !status.track.below_horizon);
   trackPill.classList.toggle("disconnected", status.track.below_horizon);
+
+  updateSlipBadge(status.motion);
 }
 
 setInterval(refreshStatus, 1500);
@@ -213,3 +261,4 @@ refreshStatus();
 refreshFiles();
 updateEstimate();
 loadTleSources();
+loadMotionSettings();
