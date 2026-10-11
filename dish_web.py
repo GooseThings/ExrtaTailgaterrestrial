@@ -603,7 +603,7 @@ def api_track_start():
     with state_lock:
         state["track_thread"] = thread
         state["track"]["running"] = True
-    thread.start()
+        thread.start()
 
     return jsonify({"ok": True})
 
