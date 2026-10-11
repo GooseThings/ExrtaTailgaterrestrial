@@ -46,7 +46,7 @@ button {
 }
 
 button:hover { background: #45475a; }
-button:disabled { opacity: 0.5; cursor: not-allowed; }
+button:disabled, input:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .status-pill {
   padding: 4px 10px;

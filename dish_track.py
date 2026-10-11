@@ -149,11 +149,13 @@ class TrackingThread(threading.Thread):
                             self.dish, 'az', az_current, dish_az,
                             step_size=self.step_size, tolerance=self.tolerance,
                             on_warning=self.on_warning, force=az_unknown,
+                            cancel_event=self.stop_event,
                         )
                         dish_motion.stepped_move(
                             self.dish, 'el', el_current, el,
                             step_size=self.step_size, tolerance=self.tolerance,
                             on_warning=self.on_warning, force=el_unknown,
+                            cancel_event=self.stop_event,
                         )
                         self.prev_az = dish_az
                         self.prev_el = el

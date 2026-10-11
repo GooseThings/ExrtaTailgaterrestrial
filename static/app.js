@@ -212,11 +212,26 @@ $("move-tolerance").addEventListener("change", saveMotionSettings);
 
 $("clear-warnings-btn").addEventListener("click", () => api("/api/motion/clear", { method: "POST" }));
 
+function updateMotionControls(busy) {
+  const stepInput = $("step-size");
+  const toleranceInput = $("move-tolerance");
+  stepInput.disabled = busy;
+  toleranceInput.disabled = busy;
+  const title = busy
+    ? "Settings apply to the next scan/track run, not the one in progress"
+    : "";
+  stepInput.title = title;
+  toleranceInput.title = title;
+}
+
 function updateSlipBadge(motion) {
   const badge = $("slip-badge");
   if (motion.slip_active) {
     const last = motion.warnings[motion.warnings.length - 1];
-    badge.textContent = `Movement warning: ${last.axis} target ${last.target_deg}° off by ${last.diff} counts`;
+    const detail = last.unverified
+      ? "could not verify (no sensor reply)"
+      : `off by ${last.diff} counts`;
+    badge.textContent = `Movement warning: ${last.axis} target ${last.target_deg}° ${detail}`;
     badge.classList.remove("disconnected");
     badge.classList.add("warning");
   } else {
@@ -237,6 +252,9 @@ async function refreshStatus() {
   }
 
   setConnected(status.connected);
+
+  const busy = status.scan.running || status.track.running;
+  updateMotionControls(busy);
 
   $("scan-start-btn").disabled = !status.connected || status.scan.running;
   $("scan-stop-btn").disabled = !status.scan.running;

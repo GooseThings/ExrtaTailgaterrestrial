@@ -64,22 +64,33 @@ def _step_targets(start, end, step):
     return targets
 
 
+def _cancelled(cancel_event):
+    return cancel_event is not None and cancel_event.is_set()
+
+
 def stepped_move(dish, axis, current_deg, target_deg,
                   step_size=DEFAULT_STEP_SIZE, tolerance=DEFAULT_TOLERANCE,
-                  retries=DEFAULT_RETRIES, on_warning=None, force=False):
+                  retries=DEFAULT_RETRIES, on_warning=None, force=False,
+                  cancel_event=None):
     """
     Move `axis` ('az' or 'el') from current_deg to target_deg in steps of
     at most `step_size` degrees, verifying the firmware's commanded
     "Dest Count" against the settled raw sensor reading after each step.
 
     Calls on_warning(dict) once per step that doesn't settle within
-    `tolerance` raw counts after `retries` resends.
+    `tolerance` raw counts after `retries` resends - including when the
+    sensor reply itself was unreadable (missing/garbled), which is treated
+    as a retry-worthy failure rather than silently passing.
 
     `force=True` always sends at least one direct move to target_deg, even
     if current_deg == target_deg - use this when current_deg is a fallback
     guess rather than a real known position (e.g. right after a restart),
     so an actually-elsewhere dish still gets commanded instead of the move
     being silently skipped.
+
+    `cancel_event`, if given, is checked before each step and each resend -
+    if set, the move stops early (e.g. a scan/track Stop request) instead
+    of running all remaining steps before noticing.
 
     Returns target_deg (the requested position - this tracks the *intended*
     degree, not a true measured one, since there's no raw-count-to-degree
@@ -105,8 +116,12 @@ def stepped_move(dish, axis, current_deg, target_deg,
     settle = max(1.5, step_size * 0.15) + 1.0
 
     for step_target in targets:
+        if _cancelled(cancel_event):
+            break
         attempt = 0
         while True:
+            if _cancelled(cancel_event):
+                break
             dish.reset_input_buffer()
             _send(dish, f"{move_cmd} {step_target}")
             ack = _read(dish, 1.0)
@@ -115,9 +130,10 @@ def stepped_move(dish, axis, current_deg, target_deg,
 
             time.sleep(settle)
             raw = _query_raw(dish, query_cmd)
-            diff = (raw - dest_count) if (raw is not None and dest_count is not None) else None
+            unreadable = raw is None or dest_count is None
+            diff = None if unreadable else (raw - dest_count)
 
-            if diff is None or abs(diff) <= tolerance:
+            if not unreadable and abs(diff) <= tolerance:
                 break
             attempt += 1
             if attempt > retries:
@@ -128,6 +144,7 @@ def stepped_move(dish, axis, current_deg, target_deg,
                         "dest_count": dest_count,
                         "settled_raw": raw,
                         "diff": diff,
+                        "unverified": unreadable,
                         "time": time.time(),
                     })
                 break
@@ -137,7 +154,8 @@ def stepped_move(dish, axis, current_deg, target_deg,
 
 
 def verify_position(dish, axis, expected_deg, tolerance=DEFAULT_TOLERANCE,
-                     on_warning=None, settle=1.5):
+                     on_warning=None, settle=1.5, retries=DEFAULT_RETRIES,
+                     cancel_event=None):
     """
     Re-affirm a position (re-sending the same target - a no-op if the dish
     is genuinely already there) and check the firmware's commanded
@@ -147,7 +165,11 @@ def verify_position(dish, axis, expected_deg, tolerance=DEFAULT_TOLERANCE,
     lash/backlash on a worn drivetrain is most likely to introduce slip
     that a per-degree sweep command wouldn't otherwise catch.
 
-    Returns the raw-count diff (None if unavailable).
+    An unreadable sensor reply is retried rather than treated as a passing
+    check; if it never resolves, a "could not verify" warning is raised
+    instead of silently reporting no issue.
+
+    Returns the raw-count diff (None if cancelled or never readable).
     """
     if axis == 'az':
         move_cmd, query_cmd = 'azangle', 'azim'
@@ -156,24 +178,35 @@ def verify_position(dish, axis, expected_deg, tolerance=DEFAULT_TOLERANCE,
     else:
         raise ValueError(f"Unknown axis: {axis}")
 
-    dish.reset_input_buffer()
-    _send(dish, f"{move_cmd} {round(expected_deg)}")
-    ack = _read(dish, 1.0)
-    m = re.search(r'Dest Count:\s*(\d+)', ack)
-    dest_count = int(m.group(1)) if m else None
+    attempt = 0
+    while True:
+        if _cancelled(cancel_event):
+            return None
 
-    time.sleep(settle)
-    raw = _query_raw(dish, query_cmd)
-    diff = (raw - dest_count) if (raw is not None and dest_count is not None) else None
+        dish.reset_input_buffer()
+        _send(dish, f"{move_cmd} {round(expected_deg)}")
+        ack = _read(dish, 1.0)
+        m = re.search(r'Dest Count:\s*(\d+)', ack)
+        dest_count = int(m.group(1)) if m else None
 
-    if diff is not None and abs(diff) > tolerance and on_warning:
-        on_warning({
-            "axis": axis,
-            "target_deg": expected_deg,
-            "dest_count": dest_count,
-            "settled_raw": raw,
-            "diff": diff,
-            "time": time.time(),
-        })
+        time.sleep(settle)
+        raw = _query_raw(dish, query_cmd)
+        unreadable = raw is None or dest_count is None
+        diff = None if unreadable else (raw - dest_count)
 
-    return diff
+        if not unreadable and abs(diff) <= tolerance:
+            return diff
+        attempt += 1
+        if attempt > retries:
+            if on_warning:
+                on_warning({
+                    "axis": axis,
+                    "target_deg": expected_deg,
+                    "dest_count": dest_count,
+                    "settled_raw": raw,
+                    "diff": diff,
+                    "unverified": unreadable,
+                    "time": time.time(),
+                })
+            return diff
+        # otherwise retry

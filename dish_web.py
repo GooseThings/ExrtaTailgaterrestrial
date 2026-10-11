@@ -33,6 +33,13 @@ BAUD_RATE = 9600
 
 state_lock = threading.Lock()
 
+# Serial port is single-owner: exactly one of a manual move, a scan, or a
+# tracking session may be using it at a time. Flag checks under state_lock
+# aren't enough on their own (two requests can both pass the check before
+# either starts moving), so this lock is held for the full duration of
+# whichever operation owns the dish.
+dish_io_lock = threading.Lock()
+
 state = {
     "dish": None,
     "port": "/dev/ttyACM0",
@@ -86,7 +93,16 @@ def _record_motion_warning(warning):
         del warnings[:-50]  # keep the last 50
 
 
-def _safe_move(dish, axis, target_deg):
+def _invalidate_position(axis):
+    """Mark an axis's tracked position estimate unknown - use this whenever
+    the dish is moved by something other than _safe_move/_verify_position
+    (relative nudges, a fresh connection, etc.) so the next tracked move
+    isn't fooled by a stale cached value into skipping a real move."""
+    with state_lock:
+        state["motion"]["position"][axis] = None
+
+
+def _safe_move(dish, axis, target_deg, cancel_event=None):
     """Stepped, verified move using the current motion settings. Falls back
     to a single direct, forced move when an axis's position is unknown
     (e.g. right after a server restart), rather than assuming we're
@@ -104,7 +120,7 @@ def _safe_move(dish, axis, target_deg):
         dish, axis, current, target_deg,
         step_size=step_size, tolerance=tolerance,
         on_warning=_record_motion_warning,
-        force=unknown,
+        force=unknown, cancel_event=cancel_event,
     )
 
     with state_lock:
@@ -112,13 +128,13 @@ def _safe_move(dish, axis, target_deg):
     return achieved
 
 
-def _verify_position(dish, axis, expected_deg):
+def _verify_position(dish, axis, expected_deg, cancel_event=None):
     """Re-affirm position at a serpentine direction-reversal point."""
     with state_lock:
         tolerance = state["motion"]["tolerance"]
     return dish_motion.verify_position(
         dish, axis, expected_deg, tolerance=tolerance,
-        on_warning=_record_motion_warning,
+        on_warning=_record_motion_warning, cancel_event=cancel_event,
     )
 
 
@@ -214,12 +230,13 @@ def api_move():
         dish = state["dish"]
         if not dish or not dish.is_open:
             return jsonify({"ok": False, "error": "Connect to the dish first."}), 400
-        if state["scan"]["running"]:
-            return jsonify({"ok": False, "error": "A scan is running."}), 400
-        if state["track"]["running"]:
-            return jsonify({"ok": False, "error": "Tracking is running."}), 400
 
-    achieved = _safe_move(dish, axis, target)
+    if not dish_io_lock.acquire(blocking=False):
+        return jsonify({"ok": False, "error": "Dish is busy with another operation."}), 409
+    try:
+        achieved = _safe_move(dish, axis, target)
+    finally:
+        dish_io_lock.release()
     return jsonify({"ok": True, "target_deg": achieved})
 
 
@@ -243,6 +260,8 @@ def api_connect():
             return jsonify({"ok": False, "error": str(e)}), 400
         state["dish"] = dish
         state["port"] = port
+    _invalidate_position('az')
+    _invalidate_position('el')
     return jsonify({"ok": True})
 
 
@@ -254,6 +273,8 @@ def api_disconnect():
         if state["dish"] and state["dish"].is_open:
             state["dish"].close()
         state["dish"] = None
+    _invalidate_position('az')
+    _invalidate_position('el')
     return jsonify({"ok": True})
 
 
@@ -277,6 +298,13 @@ def api_scan_estimate():
     return jsonify({"minutes": minutes})
 
 
+def _run_scan_locked(*args):
+    try:
+        _run_scan(*args)
+    finally:
+        dish_io_lock.release()
+
+
 @app.route("/api/scan/start", methods=["POST"])
 def api_scan_start():
     with state_lock:
@@ -293,6 +321,9 @@ def api_scan_start():
         el_end = max(5, min(70, int(p["el_end"])))
         resolution = int(p.get("resolution", 1))
 
+        if not dish_io_lock.acquire(blocking=False):
+            return jsonify({"ok": False, "error": "Dish is busy with another operation."}), 409
+
         stop_event = threading.Event()
         state["scan_stop"] = stop_event
         state["scan"] = {
@@ -302,7 +333,7 @@ def api_scan_start():
         }
 
         thread = threading.Thread(
-            target=_run_scan, args=(dish, az_start, az_end, el_start, el_end, resolution, stop_event),
+            target=_run_scan_locked, args=(dish, az_start, az_end, el_start, el_end, resolution, stop_event),
             daemon=True,
         )
         state["scan_thread"] = thread
@@ -351,8 +382,8 @@ def _run_scan(dish, az_start, az_end, el_start, el_end, resolution, stop_event):
         sky_data = np.zeros((el_range + 1, az_range + 1))
 
         log_scan("Moving dish to starting position...")
-        _safe_move(dish, 'az', az_start)
-        _safe_move(dish, 'el', el_start)
+        _safe_move(dish, 'az', az_start, cancel_event=stop_event)
+        _safe_move(dish, 'el', el_start, cancel_event=stop_event)
 
         state["scan"]["total"] = (el_range) * (az_range)
 
@@ -372,7 +403,7 @@ def _run_scan(dish, az_start, az_end, el_start, el_end, resolution, stop_event):
                     az_sequence = range(az_end - 1, az_start - 1, -1)
                     row_end_az = az_start
 
-                for azimuth in az_sequence:
+                for i, azimuth in enumerate(az_sequence):
                     if stop_event.is_set():
                         break
                     send_command(dish, f"azangle {azimuth}")
@@ -382,11 +413,19 @@ def _run_scan(dish, az_start, az_end, el_start, el_end, resolution, stop_event):
                     _record_point(sky_data, pixels, sky_image, timestr,
                                    abs(elevation - el_end), abs(azimuth - az_end), signal_strength,
                                    azimuth, elevation)
+                    if i == 0 and elevation != el_start:
+                        # First step after a direction reversal - gear lash on
+                        # a worn drivetrain is most likely to show up right
+                        # here, before the row-end check ever runs.
+                        _verify_position(dish, 'az', azimuth, cancel_event=stop_event)
+
+                if stop_event.is_set():
+                    break
 
                 # Direction is about to reverse - this is where gear lash on a
                 # worn drivetrain is most likely to introduce slip, so verify
                 # instead of trusting the last sweep command landed cleanly.
-                _verify_position(dish, 'az', row_end_az)
+                _verify_position(dish, 'az', row_end_az, cancel_event=stop_event)
                 ascending = not ascending
         else:
             for elevation in range(0, el_range):
@@ -402,8 +441,19 @@ def _run_scan(dish, az_start, az_end, el_start, el_end, resolution, stop_event):
                     _record_point(sky_data, pixels, sky_image, timestr,
                                    abs(elevation - el_range), abs(azimuth - az_range), signal_strength,
                                    azimuth, elevation)
-                _safe_move(dish, 'az', az_start)
+
+                if stop_event.is_set():
+                    break
+
+                # aznudge is relative, so the tracked az position (set by
+                # _safe_move) no longer reflects reality once the nudge loop
+                # above has run - without invalidating it first, _safe_move
+                # would see "already at az_start" from a prior row's return
+                # and skip sending any command at all.
+                _invalidate_position('az')
+                _safe_move(dish, 'az', az_start, cancel_event=stop_event)
                 send_command(dish, "elnudge up")
+                _invalidate_position('el')
 
         state["scan"]["last_file"] = f"raw-data-{timestr}.txt"
         log_scan("Scan complete!" if not stop_event.is_set() else "Scan stopped.")
@@ -413,6 +463,11 @@ def _run_scan(dish, az_start, az_end, el_start, el_end, resolution, stop_event):
         log_scan(f"Error: {e}")
     finally:
         state["scan"]["running"] = False
+        # The sweep used untracked relative/per-degree moves throughout, so
+        # the next operation (another scan, a manual move, tracking) should
+        # not trust whatever the cache happens to hold - force it to verify.
+        _invalidate_position('az')
+        _invalidate_position('el')
 
 
 def _record_point(sky_data, pixels, sky_image, timestr, row, col, signal_strength, azimuth, elevation):
@@ -506,9 +561,11 @@ def api_track_load():
 
 
 def _track_callback(message, below_horizon):
-    with state_lock:
-        state["track"]["message"] = message
-        state["track"]["below_horizon"] = below_horizon
+    # Deliberately lock-free: _stop_track_locked() joins this thread while
+    # holding state_lock, so this callback must never need that lock itself
+    # or the join would deadlock against it.
+    state["track"]["message"] = message
+    state["track"]["below_horizon"] = below_horizon
 
 
 @app.route("/api/track/start", methods=["POST"])
@@ -522,6 +579,9 @@ def api_track_start():
             return jsonify({"ok": False, "error": "Invalid satellite selection."}), 400
 
         _stop_track_locked()
+
+        if not dish_io_lock.acquire(blocking=False):
+            return jsonify({"ok": False, "error": "Dish is busy with another operation."}), 409
 
         step_size = state["motion"]["step_size"]
         tolerance = state["motion"]["tolerance"]
@@ -549,6 +609,10 @@ def _stop_track_locked():
     thread = state["track_thread"]
     if thread:
         thread.stop()
+        # Wait for it to actually exit before anything else (a new track,
+        # a scan, a manual move) can touch the same serial port.
+        thread.join(timeout=10)
+        dish_io_lock.release()
     state["track_thread"] = None
     state["track"]["running"] = False
 
