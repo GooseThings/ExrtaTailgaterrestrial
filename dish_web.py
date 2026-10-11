@@ -561,9 +561,8 @@ def api_track_load():
 
 
 def _track_callback(message, below_horizon):
-    # Deliberately lock-free: _stop_track_locked() joins this thread while
-    # holding state_lock, so this callback must never need that lock itself
-    # or the join would deadlock against it.
+    # Deliberately lock-free - called frequently from the tracking thread,
+    # and these two fields don't need to be consistent with anything else.
     state["track"]["message"] = message
     state["track"]["below_horizon"] = below_horizon
 
@@ -571,30 +570,40 @@ def _track_callback(message, below_horizon):
 @app.route("/api/track/start", methods=["POST"])
 def api_track_start():
     idx = int((request.json or {}).get("index", -1))
+
     with state_lock:
         dish = state["dish"]
         if not dish or not dish.is_open:
             return jsonify({"ok": False, "error": "Connect to the dish first."}), 400
         if idx < 0 or idx >= len(state["satellites"]):
             return jsonify({"ok": False, "error": "Invalid satellite selection."}), 400
-
-        _stop_track_locked()
-
-        if not dish_io_lock.acquire(blocking=False):
-            return jsonify({"ok": False, "error": "Dish is busy with another operation."}), 409
-
         step_size = state["motion"]["step_size"]
         tolerance = state["motion"]["tolerance"]
-
         name, l1, l2 = state["satellites"][idx]
-        tracker = dish_track.SatelliteTracker(name, l1, l2, dish_track.OBSERVER_LAT, dish_track.OBSERVER_LON)
-        thread = dish_track.TrackingThread(
-            tracker, dish, _track_callback,
-            step_size=step_size, tolerance=tolerance, on_warning=_record_motion_warning,
-        )
+
+    # Stop/join any previous tracker *before* trying to acquire the dish -
+    # this must happen without holding state_lock, since the old thread's
+    # own exit handler needs that lock too (see _on_track_thread_exit).
+    _stop_track()
+
+    if not dish_io_lock.acquire(blocking=False):
+        return jsonify({"ok": False, "error": "Dish is busy with another operation."}), 409
+
+    tracker = dish_track.SatelliteTracker(name, l1, l2, dish_track.OBSERVER_LAT, dish_track.OBSERVER_LON)
+    thread = dish_track.TrackingThread(
+        tracker, dish, _track_callback,
+        step_size=step_size, tolerance=tolerance, on_warning=_record_motion_warning,
+    )
+    # on_exit fires from inside the thread itself whenever run() ends, for
+    # ANY reason - an external stop, or the thread dying on its own (e.g. a
+    # SerialException) - so the dish reservation is always released even if
+    # nobody called stop/join on it.
+    thread.on_exit = lambda: _on_track_thread_exit(thread)
+
+    with state_lock:
         state["track_thread"] = thread
         state["track"]["running"] = True
-        thread.start()
+    thread.start()
 
     return jsonify({"ok": True})
 
@@ -605,21 +614,41 @@ def api_track_stop():
     return jsonify({"ok": True})
 
 
-def _stop_track_locked():
-    thread = state["track_thread"]
-    if thread:
-        thread.stop()
-        # Wait for it to actually exit before anything else (a new track,
-        # a scan, a manual move) can touch the same serial port.
-        thread.join(timeout=10)
-        dish_io_lock.release()
-    state["track_thread"] = None
-    state["track"]["running"] = False
+def _release_track_io_lock_once(thread):
+    """Idempotent: release dish_io_lock for this tracking thread exactly
+    once, however many code paths notice it has ended."""
+    with state_lock:
+        if thread is None or getattr(thread, '_io_lock_released', False):
+            return
+        thread._io_lock_released = True
+    dish_io_lock.release()
+
+
+def _on_track_thread_exit(thread):
+    """Called from the TrackingThread itself when its run() loop ends for
+    any reason. Only clears the shared slot if this thread is still the
+    one registered there (a newer tracker may have already replaced it)."""
+    _release_track_io_lock_once(thread)
+    with state_lock:
+        if state.get("track_thread") is thread:
+            state["track_thread"] = None
+            state["track"]["running"] = False
 
 
 def _stop_track():
     with state_lock:
-        _stop_track_locked()
+        thread = state["track_thread"]
+    if not thread:
+        return
+    thread.stop()
+    # Wait for it to actually exit before anything else (a new track, a
+    # scan, a manual move) can touch the same serial port.
+    thread.join(timeout=10)
+    _release_track_io_lock_once(thread)
+    with state_lock:
+        if state.get("track_thread") is thread:
+            state["track_thread"] = None
+            state["track"]["running"] = False
 
 
 # ────────────────────────────────────────────────────────────────

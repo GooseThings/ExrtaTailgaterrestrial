@@ -107,7 +107,7 @@ class SatelliteTracker:
 
 class TrackingThread(threading.Thread):
     def __init__(self, tracker, dish, callback,
-                 step_size=None, tolerance=None, on_warning=None):
+                 step_size=None, tolerance=None, on_warning=None, on_exit=None):
         super().__init__(daemon=True)
         self.tracker = tracker
         self.dish = dish
@@ -117,11 +117,19 @@ class TrackingThread(threading.Thread):
         self.step_size = step_size or dish_motion.DEFAULT_STEP_SIZE
         self.tolerance = tolerance or dish_motion.DEFAULT_TOLERANCE
         self.on_warning = on_warning
+        self.on_exit = on_exit
 
         self.prev_az = None
         self.prev_el = None
 
     def run(self):
+        try:
+            self._run()
+        finally:
+            if self.on_exit:
+                self.on_exit()
+
+    def _run(self):
         while not self.stop_event.is_set():
             try:
                 az, el, dist = self.tracker.get_position()
