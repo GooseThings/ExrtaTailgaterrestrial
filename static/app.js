@@ -259,22 +259,30 @@ let trackMarker = null;
 let trackPathLines = [];
 let selectedSatIndex = null;
 let dishLocationMarker = null;
-
-// Leaflet's stock pin at ~60% size - small enough not to dominate the map
-// at low zoom, where the satellite's ground track can span continents.
-const SMALL_PIN_ICON = L.icon({
-  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-  iconSize: [15, 25],
-  iconAnchor: [7, 25],
-  popupAnchor: [1, -20],
-  shadowSize: [25, 25],
-});
+let smallPinIcon = null;
 
 async function initTrackMap() {
   if (trackMap) {
     trackMap.invalidateSize();
     return;
+  }
+
+  // Built lazily, on first actual use, rather than at script load (top
+  // level) - L.icon() needs the Leaflet global, and if that CDN script
+  // fails to load (offline, blocked, CDN down), a top-level call would
+  // throw before this script even finishes registering the rest of the
+  // page's button handlers, breaking everything instead of just maps.
+  if (!smallPinIcon) {
+    // Leaflet's stock pin at ~60% size - small enough not to dominate the
+    // map at low zoom, where the satellite's ground track can span continents.
+    smallPinIcon = L.icon({
+      iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+      shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+      iconSize: [15, 25],
+      iconAnchor: [7, 25],
+      popupAnchor: [1, -20],
+      shadowSize: [25, 25],
+    });
   }
 
   // Read straight from the API rather than the Location tab's input
@@ -295,7 +303,7 @@ async function initTrackMap() {
     attribution: "&copy; OpenStreetMap contributors",
   }).addTo(trackMap);
 
-  dishLocationMarker = L.marker([lat, lon], { icon: SMALL_PIN_ICON }).addTo(trackMap).bindPopup("Dish location");
+  dishLocationMarker = L.marker([lat, lon], { icon: smallPinIcon }).addTo(trackMap).bindPopup("Dish location");
   trackMarker = L.circleMarker([lat, lon], { radius: 6, color: "#f38ba8", fillOpacity: 1 }).addTo(trackMap);
 }
 
