@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ExtraTailgaterrestrial</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 </head>
 <body>
   <header>
@@ -13,6 +15,7 @@
       <input id="port" type="text" value="/dev/ttyACM0" placeholder="Serial port">
       <button id="connect-btn">Connect</button>
       <span id="conn-status" class="status-pill disconnected">Disconnected</span>
+      <button id="reboot-btn" title="Restart the dish_web.py server process">Reboot Server</button>
     </div>
   </header>
 
@@ -31,6 +34,7 @@
     <button class="tab-btn active" data-tab="scan">Scan</button>
     <button class="tab-btn" data-tab="view">View Image</button>
     <button class="tab-btn" data-tab="track">Track</button>
+    <button class="tab-btn" data-tab="location">Location</button>
   </nav>
 
   <main>
@@ -73,21 +77,76 @@
     </section>
 
     <section id="tab-track" class="tab-panel">
-      <div class="button-row">
-        <select id="tle-source-select"></select>
-        <button id="load-tles-btn">Load Satellites</button>
+      <div class="panel-grid">
+        <div>
+          <div class="button-row">
+            <select id="tle-source-select"></select>
+            <button id="load-tles-btn">Load Satellites</button>
+            <button id="resort-tles-btn">Resort</button>
+          </div>
+          <div id="tle-updated" class="hint">Kepler data: never pulled</div>
+          <div id="rank-note" class="hint" hidden></div>
+          <div class="button-row">
+            <select id="satellite-select" size="10"></select>
+          </div>
+          <div class="button-row">
+            <button id="track-start-btn">Start Tracking</button>
+            <button id="track-stop-btn" disabled>Stop</button>
+          </div>
+          <div id="track-status" class="status-pill">Not tracking</div>
+
+          <div class="stats-box">
+            <h3>Track settings</h3>
+            <label>Min elevation to track (°)
+              <input type="number" id="min-elevation" min="0" max="70" step="1" value="5">
+            </label>
+            <label>Max distance to track (km, blank = no limit)
+              <input type="number" id="max-distance" min="100" max="50000" step="50" placeholder="no limit">
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" id="show-constellations">
+              Show internet constellation sats (Starlink, OneWeb, Kuiper, Iridium, Globalstar, Orbcomm)
+            </label>
+          </div>
+
+          <div class="stats-box">
+            <h3>Dish</h3>
+            <div class="stat-row"><span>Connection</span><span id="dish-stat-conn">—</span></div>
+            <div class="stat-row"><span>Commanded Az</span><span id="dish-stat-az">—</span></div>
+            <div class="stat-row"><span>Commanded El</span><span id="dish-stat-el">—</span></div>
+            <div class="stat-row"><span>Step / Tolerance</span><span id="dish-stat-step">—</span></div>
+          </div>
+        </div>
+
+        <div>
+          <div class="stats-box">
+            <h3 id="sat-info-name">No satellite selected</h3>
+            <div class="stat-row"><span>NORAD ID</span><span id="sat-info-id">—</span></div>
+            <div class="stat-row"><span>Azimuth</span><span id="sat-info-az">—</span></div>
+            <div class="stat-row"><span>Elevation</span><span id="sat-info-el">—</span></div>
+            <div class="stat-row"><span>Range</span><span id="sat-info-dist">—</span></div>
+            <div class="stat-row"><span>Altitude</span><span id="sat-info-alt">—</span></div>
+            <div class="stat-row"><span>Speed</span><span id="sat-info-speed">—</span></div>
+          </div>
+          <div id="track-map"></div>
+        </div>
       </div>
+    </section>
+
+    <section id="tab-location" class="tab-panel">
+      <p class="hint">Click the map, or drag the marker, to set where the dish is sitting. This is used to work out satellite rise times and tracking geometry.</p>
       <div class="button-row">
-        <select id="satellite-select" size="10"></select>
+        <label>Latitude <input type="number" id="observer-lat" step="0.0001" min="-90" max="90"></label>
+        <label>Longitude <input type="number" id="observer-lon" step="0.0001" min="-180" max="180"></label>
+        <button id="save-observer-btn">Save Location</button>
+        <span id="observer-saved" class="status-pill" hidden>Saved</span>
       </div>
-      <div class="button-row">
-        <button id="track-start-btn">Start Tracking</button>
-        <button id="track-stop-btn" disabled>Stop</button>
-      </div>
-      <div id="track-status" class="status-pill">Not tracking</div>
+      <div id="observer-map"></div>
     </section>
   </main>
 
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
 </html>
