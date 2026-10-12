@@ -153,7 +153,15 @@ $("render-btn").addEventListener("click", () => {
   if (!file) return alert("Pick a scan file first.");
   const factor = $("interp-factor").value;
   const img = $("rendered-image");
-  img.src = `/api/image.png?file=${encodeURIComponent(file)}&factor=${factor}&t=${Date.now()}`;
+  // Built via the URL API rather than raw template-string interpolation -
+  // URLSearchParams handles encoding itself, so there's no way for a
+  // value read from the DOM to end up somewhere other than a query
+  // parameter value, however it's selected/loaded from /api/files.
+  const url = new URL("/api/image.png", window.location.origin);
+  url.searchParams.set("file", file);
+  url.searchParams.set("factor", factor);
+  url.searchParams.set("t", Date.now());
+  img.src = url.toString();
   img.hidden = false;
 });
 

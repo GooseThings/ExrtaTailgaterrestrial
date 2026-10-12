@@ -404,7 +404,13 @@ def api_connect():
             )
         except serial.SerialException as e:
             state["dish"] = None
-            return jsonify({"ok": False, "error": str(e)}), 400
+            # The raw exception (OS error text, full device path) isn't
+            # shown to the client - this binds to 127.0.0.1 but could be
+            # exposed to others on a LAN (e.g. shared over wifi at an
+            # actual tailgate), and CodeQL correctly flags returning
+            # exception text as information exposure (py/stack-trace-exposure).
+            print(f"[connect] {e}", file=sys.stderr)
+            return jsonify({"ok": False, "error": f"Could not open serial port {port}."}), 400
         state["dish"] = dish
         state["port"] = port
     _invalidate_position('az')
@@ -699,7 +705,8 @@ def api_image():
     try:
         data, x, az_ticks, y, el_ticks, timestamp = dish_image.load_scan(filename, factor)
     except (ValueError, FileNotFoundError, OSError) as e:
-        return jsonify({"error": str(e)}), 400
+        print(f"[image] {filename}: {e}", file=sys.stderr)
+        return jsonify({"error": "Could not load that scan file."}), 400
 
     fig = Figure(figsize=(8, 6))
     ax = fig.add_subplot(111)
@@ -828,7 +835,8 @@ def api_track_load():
         # leaving the user with nothing.
         cached = _load_tle_cache()
         if cached is None:
-            return jsonify({"ok": False, "error": str(e)}), 400
+            print(f"[track/load] {source}: {e}", file=sys.stderr)
+            return jsonify({"ok": False, "error": "Could not load satellite data and no local cache is available."}), 400
         used_source, fetched_at, sats = cached
         cached_fallback = True
 
