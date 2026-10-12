@@ -9,7 +9,10 @@
 
 import glob
 import io
+import json
 import os
+import subprocess
+import sys
 import threading
 import time
 
@@ -24,8 +27,94 @@ import dish_motion
 import dish_track
 
 app = Flask(__name__)
+# This app's static/*.js and templates get edited and the server restarted
+# often during development - without this, browsers keep serving a stale
+# cached app.js after a restart even on a plain reload.
+app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
 
 BAUD_RATE = 9600
+OBSERVER_FILE = "observer_location.json"
+TRACK_SETTINGS_FILE = "track_settings.json"
+TLE_CACHE_FILE = "tle_cache.json"
+# Not committed - create it by hand (see README) with your own free
+# space-track.org account. Kept out of the request/response cycle
+# entirely so the credentials never pass through chat/logs.
+SPACE_TRACK_CREDENTIALS_FILE = "space_track_credentials.json"
+
+# Sources picked specifically for one constellation should always show
+# it, regardless of the "show constellations" setting that otherwise
+# filters Starlink/OneWeb/etc. out of the general lists.
+DEDICATED_CONSTELLATION_SOURCES = {"Celestrak - Starlink", dish_track.SPACE_TRACK_STARLINK_SOURCE_NAME}
+
+
+def _load_space_track_credentials():
+    try:
+        with open(SPACE_TRACK_CREDENTIALS_FILE) as f:
+            data = json.load(f)
+        username, password = data["username"], data["password"]
+        if username and password:
+            return username, password
+    except (OSError, ValueError, KeyError):
+        pass
+    return None
+
+
+def _load_observer():
+    try:
+        with open(OBSERVER_FILE) as f:
+            data = json.load(f)
+            return {"lat": float(data["lat"]), "lon": float(data["lon"])}
+    except (OSError, ValueError, KeyError):
+        return {"lat": dish_track.OBSERVER_LAT, "lon": dish_track.OBSERVER_LON}
+
+
+def _save_observer(lat, lon):
+    with open(OBSERVER_FILE, "w") as f:
+        json.dump({"lat": lat, "lon": lon}, f)
+
+
+def _load_track_settings():
+    defaults = {"min_elevation": dish_track.MIN_ELEVATION, "max_distance_km": None, "show_constellations": False}
+    try:
+        with open(TRACK_SETTINGS_FILE) as f:
+            data = json.load(f)
+            defaults["min_elevation"] = float(data["min_elevation"])
+            max_distance_km = data.get("max_distance_km")
+            defaults["max_distance_km"] = float(max_distance_km) if max_distance_km is not None else None
+            defaults["show_constellations"] = bool(data.get("show_constellations", False))
+    except (OSError, ValueError, KeyError):
+        pass
+    return defaults
+
+
+def _save_track_settings(min_elevation, max_distance_km, show_constellations):
+    with open(TRACK_SETTINGS_FILE, "w") as f:
+        json.dump({
+            "min_elevation": min_elevation,
+            "max_distance_km": max_distance_km,
+            "show_constellations": show_constellations,
+        }, f)
+
+
+def _load_tle_cache():
+    """Returns (source, fetched_at, sats) from the last successful TLE
+    fetch, or None if there isn't one yet."""
+    try:
+        with open(TLE_CACHE_FILE) as f:
+            data = json.load(f)
+        sats = [(s[0], s[1], s[2]) for s in data["satellites"]]
+        return data["source"], float(data["fetched_at"]), sats
+    except (OSError, ValueError, KeyError, IndexError, TypeError):
+        return None
+
+
+def _save_tle_cache(source, sats, fetched_at):
+    with open(TLE_CACHE_FILE, "w") as f:
+        json.dump({
+            "source": source,
+            "fetched_at": fetched_at,
+            "satellites": [[name, l1, l2] for name, l1, l2 in sats],
+        }, f)
 
 # ────────────────────────────────────────────────────────────────
 # SHARED STATE
@@ -59,12 +148,18 @@ state = {
     },
     "scan_preview_png": None,
 
+    "observer": _load_observer(),
+    "track_settings": _load_track_settings(),
+
     "satellites": [],
+    "all_satellites": [],  # unfiltered - "satellites" is this minus constellation sats, unless shown
     "track_thread": None,
     "track": {
         "running": False,
         "message": "Not tracking",
         "below_horizon": False,
+        "tle_fetched_at": None,
+        "tle_source": None,
     },
 
     "motion": {
@@ -74,6 +169,27 @@ state = {
         "position": {"az": None, "el": None},
     },
 }
+
+# Preload whatever TLE data was last successfully fetched, so a restart
+# doesn't leave the Track tab empty until the user re-pulls it by hand.
+_cached_tle = _load_tle_cache()
+if _cached_tle is not None:
+    _cached_source, _cached_fetched_at, _cached_sats = _cached_tle
+    state["all_satellites"] = _cached_sats
+    _allow_constellations = (
+        state["track_settings"]["show_constellations"]
+        or _cached_source in DEDICATED_CONSTELLATION_SOURCES
+    )
+    _filtered = _cached_sats if _allow_constellations else [
+        s for s in _cached_sats if not dish_track.is_constellation_sat(s[0])
+    ]
+    _ranked, _ = dish_track.rank_by_next_pass(
+        _filtered, state["observer"]["lat"], state["observer"]["lon"],
+        horizon_deg=state["track_settings"]["min_elevation"],
+    )
+    state["satellites"] = [(r["name"], r["l1"], r["l2"]) for r in _ranked]
+    state["track"]["tle_fetched_at"] = _cached_fetched_at
+    state["track"]["tle_source"] = _cached_source
 
 
 def log_scan(message):
@@ -100,6 +216,17 @@ def _invalidate_position(axis):
     isn't fooled by a stale cached value into skipping a real move."""
     with state_lock:
         state["motion"]["position"][axis] = None
+
+
+def _record_track_position(az, el):
+    # TrackingThread drives the dish via dish_motion.stepped_move directly
+    # rather than through _safe_move (it has its own az/el continuity
+    # bookkeeping independent of _safe_move's), so without this the
+    # commanded-position status shown in the UI would never update while
+    # a track session is running.
+    with state_lock:
+        state["motion"]["position"]["az"] = az
+        state["motion"]["position"]["el"] = el
 
 
 def _safe_move(dish, axis, target_deg, cancel_event=None):
@@ -188,6 +315,7 @@ def api_status():
                 "tolerance": state["motion"]["tolerance"],
                 "slip_active": bool(recent),
                 "warnings": list(warnings[-20:]),
+                "position": dict(state["motion"]["position"]),
             },
         })
 
@@ -275,6 +403,41 @@ def api_disconnect():
         state["dish"] = None
     _invalidate_position('az')
     _invalidate_position('el')
+    return jsonify({"ok": True})
+
+
+def _restart_process():
+    # Give the HTTP response below time to actually reach the browser
+    # before tearing this process down.
+    #
+    # This spawns a successor and then hard-exits, rather than
+    # os.execv-ing in place: Werkzeug's listening socket turned out to
+    # survive execv (it's inheritable, and exec doesn't close inheritable
+    # fds), leaving an orphaned copy still bound to the port with no
+    # Python-level handle left to close it - the re-exec'd process would
+    # then fail to rebind until the *original* process fully exited.
+    # subprocess.Popen defaults to close_fds=True, so the successor starts
+    # with no inherited sockets, and os._exit() (not sys.exit(), which
+    # only unwinds this one thread) immediately tears down every fd this
+    # process holds, freeing the port for the successor to bind.
+    time.sleep(1.0)
+    subprocess.Popen(
+        [sys.executable] + sys.argv,
+        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+    os._exit(0)
+
+
+@app.route("/api/system/reboot", methods=["POST"])
+def api_system_reboot():
+    _stop_scan()
+    _stop_track()
+    with state_lock:
+        if state["dish"] and state["dish"].is_open:
+            state["dish"].close()
+        state["dish"] = None
+    threading.Thread(target=_restart_process, daemon=False).start()
     return jsonify({"ok": True})
 
 
@@ -537,27 +700,165 @@ def api_image():
 
 
 # ────────────────────────────────────────────────────────────────
+# OBSERVER POSITION
+# ────────────────────────────────────────────────────────────────
+
+@app.route("/api/observer", methods=["GET", "POST"])
+def api_observer():
+    if request.method == "POST":
+        p = request.json or {}
+        try:
+            lat = max(-90.0, min(90.0, float(p["lat"])))
+            lon = max(-180.0, min(180.0, float(p["lon"])))
+        except (KeyError, ValueError, TypeError):
+            return jsonify({"ok": False, "error": "lat/lon required"}), 400
+        with state_lock:
+            state["observer"] = {"lat": lat, "lon": lon}
+        _save_observer(lat, lon)
+    with state_lock:
+        return jsonify({"ok": True, **state["observer"]})
+
+
+# ────────────────────────────────────────────────────────────────
 # TRACK
 # ────────────────────────────────────────────────────────────────
 
 @app.route("/api/track/sources")
 def api_track_sources():
-    return jsonify({"sources": list(dish_track.TLE_SOURCES.keys())})
+    sources = list(dish_track.TLE_SOURCES.keys())
+    # Only offered once credentials actually exist, so the dropdown never
+    # shows an option that's guaranteed to fail.
+    if _load_space_track_credentials() is not None:
+        sources.extend(dish_track.SPACE_TRACK_QUERIES.keys())
+    return jsonify({"sources": sources})
+
+
+def _ranked_response(sats, allow_constellations=False):
+    with state_lock:
+        observer = state["observer"]
+        min_elevation = state["track_settings"]["min_elevation"]
+        show_constellations = state["track_settings"]["show_constellations"]
+
+    if not (allow_constellations or show_constellations):
+        sats = [s for s in sats if not dish_track.is_constellation_sat(s[0])]
+
+    ranked, was_ranked = dish_track.rank_by_next_pass(sats, observer["lat"], observer["lon"], horizon_deg=min_elevation)
+    with state_lock:
+        state["satellites"] = [(r["name"], r["l1"], r["l2"]) for r in ranked]
+    satellites = [{"name": r["name"], "seconds_until": r["seconds_until"]} for r in ranked]
+    return satellites, was_ranked
+
+
+@app.route("/api/track/settings", methods=["GET", "POST"])
+def api_track_settings():
+    if request.method == "POST":
+        p = request.json or {}
+        try:
+            min_elevation = max(0.0, min(dish_motion.MAX_ELEVATION, float(p["min_elevation"])))
+        except (KeyError, ValueError, TypeError):
+            return jsonify({"ok": False, "error": "min_elevation required"}), 400
+
+        max_distance_km = p.get("max_distance_km")
+        if max_distance_km in (None, "", 0):
+            max_distance_km = None
+        else:
+            try:
+                max_distance_km = max(100.0, min(50000.0, float(max_distance_km)))
+            except (ValueError, TypeError):
+                return jsonify({"ok": False, "error": "invalid max_distance_km"}), 400
+
+        show_constellations = bool(p.get("show_constellations", False))
+
+        with state_lock:
+            state["track_settings"] = {
+                "min_elevation": min_elevation,
+                "max_distance_km": max_distance_km,
+                "show_constellations": show_constellations,
+            }
+        _save_track_settings(min_elevation, max_distance_km, show_constellations)
+
+    with state_lock:
+        return jsonify({"ok": True, **state["track_settings"]})
 
 
 @app.route("/api/track/load", methods=["POST"])
 def api_track_load():
     source = (request.json or {}).get("source", list(dish_track.TLE_SOURCES.keys())[0])
-    if source not in dish_track.TLE_SOURCES:
+    is_space_track = source in dish_track.SPACE_TRACK_QUERIES
+    if not is_space_track and source not in dish_track.TLE_SOURCES:
         return jsonify({"ok": False, "error": "Unknown source."}), 400
-    url = dish_track.TLE_SOURCES[source]
+
     try:
-        sats = dish_track.fetch_tle_catalogue(url)
+        if is_space_track:
+            creds = _load_space_track_credentials()
+            if creds is None:
+                raise RuntimeError(f"{SPACE_TRACK_CREDENTIALS_FILE} is missing or incomplete.")
+            used_source = source
+            sats = dish_track.fetch_space_track_catalogue(*creds, dish_track.SPACE_TRACK_QUERIES[source])
+        else:
+            # Space-Track needs its own credentialed login, so it isn't
+            # part of this automatic Celestrak/AMSAT fallback chain -
+            # only tried when explicitly selected, above.
+            used_source, sats = dish_track.fetch_tle_catalogue_with_fallback(source)
+        fetched_at = time.time()
+        _save_tle_cache(used_source, sats, fetched_at)
+        display_source = used_source
     except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 400
+        # Every live option failed (e.g. no internet at all right now) -
+        # fall back to whatever was last successfully pulled rather than
+        # leaving the user with nothing.
+        cached = _load_tle_cache()
+        if cached is None:
+            return jsonify({"ok": False, "error": str(e)}), 400
+        used_source, fetched_at, sats = cached
+        display_source = f"{used_source} (cached - live fetch failed)"
+
+    allow_constellations = used_source in DEDICATED_CONSTELLATION_SOURCES
+
     with state_lock:
-        state["satellites"] = sats
-    return jsonify({"ok": True, "satellites": [name for name, _, _ in sats]})
+        state["track"]["tle_fetched_at"] = fetched_at
+        state["track"]["tle_source"] = used_source
+        state["all_satellites"] = sats
+    satellites, ranked = _ranked_response(sats, allow_constellations=allow_constellations)
+    return jsonify({
+        "ok": True,
+        "source": display_source,
+        "satellites": satellites,
+        "ranked": ranked,
+    })
+
+
+@app.route("/api/track/live")
+def api_track_live():
+    idx = int(request.args.get("index", -1))
+    with state_lock:
+        if idx < 0 or idx >= len(state["satellites"]):
+            return jsonify({"ok": False, "error": "Invalid satellite selection."}), 400
+        name, l1, l2 = state["satellites"][idx]
+        observer = state["observer"]
+
+    tracker = dish_track.SatelliteTracker(name, l1, l2, observer["lat"], observer["lon"])
+    return jsonify({
+        "ok": True,
+        "live": tracker.get_full_position(),
+        "path": dish_track.ground_track(name, l1, l2),
+    })
+
+
+@app.route("/api/track/resort", methods=["POST"])
+def api_track_resort():
+    """Re-rank the already-loaded satellites against the current observer
+    position/time, without re-downloading TLEs. Reads from all_satellites
+    (not satellites) so that toggling "show constellations" takes effect
+    immediately on the next resort instead of only on the next fresh load."""
+    with state_lock:
+        sats = list(state["all_satellites"])
+        current_source = state["track"]["tle_source"]
+    if not sats:
+        return jsonify({"ok": False, "error": "No satellites loaded."}), 400
+    allow_constellations = current_source in DEDICATED_CONSTELLATION_SOURCES
+    satellites, ranked = _ranked_response(sats, allow_constellations=allow_constellations)
+    return jsonify({"ok": True, "satellites": satellites, "ranked": ranked})
 
 
 def _track_callback(message, below_horizon):
@@ -580,6 +881,8 @@ def api_track_start():
         step_size = state["motion"]["step_size"]
         tolerance = state["motion"]["tolerance"]
         name, l1, l2 = state["satellites"][idx]
+        observer = state["observer"]
+        track_settings = state["track_settings"]
 
     # Stop/join any previous tracker *before* trying to acquire the dish -
     # this must happen without holding state_lock, since the old thread's
@@ -589,10 +892,13 @@ def api_track_start():
     if not dish_io_lock.acquire(blocking=False):
         return jsonify({"ok": False, "error": "Dish is busy with another operation."}), 409
 
-    tracker = dish_track.SatelliteTracker(name, l1, l2, dish_track.OBSERVER_LAT, dish_track.OBSERVER_LON)
+    tracker = dish_track.SatelliteTracker(name, l1, l2, observer["lat"], observer["lon"])
     thread = dish_track.TrackingThread(
         tracker, dish, _track_callback,
         step_size=step_size, tolerance=tolerance, on_warning=_record_motion_warning,
+        min_elevation=track_settings["min_elevation"],
+        max_distance_km=track_settings["max_distance_km"],
+        on_position=_record_track_position,
     )
     # on_exit fires from inside the thread itself whenever run() ends, for
     # ANY reason - an external stop, or the thread dying on its own (e.g. a
@@ -661,4 +967,20 @@ def index():
 
 
 if __name__ == "__main__":
-    app.run(host="127.0.0.1", port=5000, threaded=True)
+    # A reboot re-execs this same process right after answering the HTTP
+    # request that triggered it - that request's own connection on port
+    # 5000 can still be closing in the kernel at that instant, so the
+    # first bind() here can transiently fail with "Address already in
+    # use" even though nothing is actually still listening. Retry instead
+    # of dying on it.
+    for attempt in range(20):
+        try:
+            app.run(host="127.0.0.1", port=5000, threaded=True)
+            break
+        except (OSError, SystemExit):
+            # Werkzeug catches the bind failure itself and calls
+            # sys.exit(1) rather than letting an OSError propagate, so
+            # SystemExit has to be caught here too.
+            if attempt == 19:
+                raise
+            time.sleep(0.5)
