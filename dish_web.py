@@ -32,6 +32,25 @@ app = Flask(__name__)
 # cached app.js after a restart even on a plain reload.
 app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
 
+
+@app.before_request
+def _reject_cross_origin_mutations():
+    # There's no auth at all here (local tool, bound to 127.0.0.1) - every
+    # POST route (reboot, disconnect, start a scan/track, move the dish...)
+    # is otherwise reachable by a plain CSRF form from any other tab/site
+    # the browser has open, since the browser will happily submit it to
+    # localhost. A classic <form> attack can't set the Origin header, so
+    # requiring it to match this server's own origin blocks that without
+    # needing any session/token machinery. Our own frontend only ever
+    # talks to this API via fetch() from this same page, which always
+    # sends Origin, so this never affects normal use.
+    if request.method != "POST":
+        return
+    origin = request.headers.get("Origin")
+    if origin is None or origin.rstrip('/') != request.host_url.rstrip('/'):
+        return jsonify({"ok": False, "error": "Cross-origin requests are not allowed."}), 403
+
+
 BAUD_RATE = 9600
 OBSERVER_FILE = "observer_location.json"
 TRACK_SETTINGS_FILE = "track_settings.json"
@@ -802,7 +821,7 @@ def api_track_load():
             used_source, sats = dish_track.fetch_tle_catalogue_with_fallback(source)
         fetched_at = time.time()
         _save_tle_cache(used_source, sats, fetched_at)
-        display_source = used_source
+        cached_fallback = False
     except Exception as e:
         # Every live option failed (e.g. no internet at all right now) -
         # fall back to whatever was last successfully pulled rather than
@@ -811,7 +830,7 @@ def api_track_load():
         if cached is None:
             return jsonify({"ok": False, "error": str(e)}), 400
         used_source, fetched_at, sats = cached
-        display_source = f"{used_source} (cached - live fetch failed)"
+        cached_fallback = True
 
     allow_constellations = used_source in DEDICATED_CONSTELLATION_SOURCES
 
@@ -822,19 +841,39 @@ def api_track_load():
     satellites, ranked = _ranked_response(sats, allow_constellations=allow_constellations)
     return jsonify({
         "ok": True,
-        "source": display_source,
+        # Always a real TLE_SOURCES/SPACE_TRACK_QUERIES key - the frontend
+        # assigns this straight to the source <select>'s value, and an
+        # annotated string like "X (cached - ...)" would silently clear
+        # that dropdown instead of selecting X.
+        "source": used_source,
+        "cached_fallback": cached_fallback,
         "satellites": satellites,
         "ranked": ranked,
     })
 
 
+def _find_satellite_by_name(name):
+    """Resolves a satellite by name against the *current* satellites list,
+    rather than trusting a list index/position from the client - an
+    auto-resort (every 30s, or on a "show constellations" toggle) can
+    reorder that list between when the browser rendered it and when a
+    request referencing a position in it arrives, which would otherwise
+    silently select a different satellite than the one actually picked."""
+    with state_lock:
+        for entry in state["satellites"]:
+            if entry[0] == name:
+                return entry
+    return None
+
+
 @app.route("/api/track/live")
 def api_track_live():
-    idx = int(request.args.get("index", -1))
+    name = request.args.get("name", "")
+    entry = _find_satellite_by_name(name)
+    if entry is None:
+        return jsonify({"ok": False, "error": "Invalid satellite selection."}), 400
+    name, l1, l2 = entry
     with state_lock:
-        if idx < 0 or idx >= len(state["satellites"]):
-            return jsonify({"ok": False, "error": "Invalid satellite selection."}), 400
-        name, l1, l2 = state["satellites"][idx]
         observer = state["observer"]
 
     tracker = dish_track.SatelliteTracker(name, l1, l2, observer["lat"], observer["lon"])
@@ -870,17 +909,18 @@ def _track_callback(message, below_horizon):
 
 @app.route("/api/track/start", methods=["POST"])
 def api_track_start():
-    idx = int((request.json or {}).get("index", -1))
+    requested_name = (request.json or {}).get("name", "")
+    entry = _find_satellite_by_name(requested_name)
+    if entry is None:
+        return jsonify({"ok": False, "error": "Invalid satellite selection."}), 400
+    name, l1, l2 = entry
 
     with state_lock:
         dish = state["dish"]
         if not dish or not dish.is_open:
             return jsonify({"ok": False, "error": "Connect to the dish first."}), 400
-        if idx < 0 or idx >= len(state["satellites"]):
-            return jsonify({"ok": False, "error": "Invalid satellite selection."}), 400
         step_size = state["motion"]["step_size"]
         tolerance = state["motion"]["tolerance"]
-        name, l1, l2 = state["satellites"][idx]
         observer = state["observer"]
         track_settings = state["track_settings"]
 

@@ -134,6 +134,14 @@ def fetch_tle_catalogue(url):
         else:
             i += 1
 
+    if not sats:
+        # A 200 with an empty body or an HTML error/maintenance page
+        # parses to zero satellites rather than raising - without this,
+        # that counts as a successful fetch, skips every other fallback
+        # source, and (in dish_web.py) overwrites the last good on-disk
+        # cache with nothing.
+        raise requests.RequestException(f"{url} returned no parseable satellites")
+
     return sats
 
 
@@ -190,6 +198,14 @@ def fetch_space_track_catalogue(username, password, query_url):
             tle_line0 = tle_line0[2:]
         name = rec.get("OBJECT_NAME") or tle_line0 or "UNKNOWN"
         sats.append((name, l1, l2))
+
+    if not sats:
+        # Same reasoning as fetch_tle_catalogue: an empty-but-200 response
+        # (e.g. the query matched nothing, or Space-Track is degraded)
+        # must not look like a successful fetch, or it overwrites the
+        # last good on-disk cache with nothing.
+        raise requests.RequestException("Space-Track query returned no satellites")
+
     return sats
 
 
@@ -370,22 +386,30 @@ class TrackingThread(threading.Thread):
                         el_unknown = self.prev_el is None
                         az_current = dish_az if az_unknown else self.prev_az
                         el_current = el if el_unknown else self.prev_el
-                        dish_motion.stepped_move(
+                        # stepped_move's return is the *clamped* target
+                        # (el is capped to dish_motion's MIN/MAX_ELEVATION,
+                        # 5-70 - a satellite can pass overhead well above
+                        # that). Recording the raw satellite az/el instead
+                        # would save a position the dish was never
+                        # actually sent to and can't physically be at,
+                        # which the next manual move would then treat as
+                        # a real baseline.
+                        achieved_az = dish_motion.stepped_move(
                             self.dish, 'az', az_current, dish_az,
                             step_size=self.step_size, tolerance=self.tolerance,
                             on_warning=self.on_warning, force=az_unknown,
                             cancel_event=self.stop_event,
                         )
-                        dish_motion.stepped_move(
+                        achieved_el = dish_motion.stepped_move(
                             self.dish, 'el', el_current, el,
                             step_size=self.step_size, tolerance=self.tolerance,
                             on_warning=self.on_warning, force=el_unknown,
                             cancel_event=self.stop_event,
                         )
-                        self.prev_az = dish_az
-                        self.prev_el = el
+                        self.prev_az = achieved_az
+                        self.prev_el = achieved_el
                         if self.on_position:
-                            self.on_position(dish_az, el)
+                            self.on_position(achieved_az, achieved_el)
 
                     self.callback(
                         f"Az: {az:.1f}° | El: {el:.1f}° | Dist: {dist:.0f} km",

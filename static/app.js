@@ -258,6 +258,18 @@ let trackMap = null;
 let trackMarker = null;
 let trackPathLines = [];
 let selectedSatIndex = null;
+let dishLocationMarker = null;
+
+// Leaflet's stock pin at ~60% size - small enough not to dominate the map
+// at low zoom, where the satellite's ground track can span continents.
+const SMALL_PIN_ICON = L.icon({
+  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+  iconSize: [15, 25],
+  iconAnchor: [7, 25],
+  popupAnchor: [1, -20],
+  shadowSize: [25, 25],
+});
 
 async function initTrackMap() {
   if (trackMap) {
@@ -283,18 +295,7 @@ async function initTrackMap() {
     attribution: "&copy; OpenStreetMap contributors",
   }).addTo(trackMap);
 
-  // Leaflet's stock pin at ~60% size - small enough not to dominate the
-  // map at low zoom, where the satellite's ground track can span
-  // continents.
-  const smallPinIcon = L.icon({
-    iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
-    shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
-    iconSize: [15, 25],
-    iconAnchor: [7, 25],
-    popupAnchor: [1, -20],
-    shadowSize: [25, 25],
-  });
-  L.marker([lat, lon], { icon: smallPinIcon }).addTo(trackMap).bindPopup("Dish location");
+  dishLocationMarker = L.marker([lat, lon], { icon: SMALL_PIN_ICON }).addTo(trackMap).bindPopup("Dish location");
   trackMarker = L.circleMarker([lat, lon], { radius: 6, color: "#f38ba8", fillOpacity: 1 }).addTo(trackMap);
 }
 
@@ -333,9 +334,9 @@ function updateSatInfo(live) {
 }
 
 async function refreshTrackLive() {
-  if (selectedSatIndex === null) return;
+  if (selectedSatName === null) return;
   try {
-    const { live, path } = await api(`/api/track/live?index=${selectedSatIndex}`);
+    const { live, path } = await api(`/api/track/live?name=${encodeURIComponent(selectedSatName)}`);
     updateSatInfo(live);
     if (trackMap) {
       trackMarker.setLatLng([live.lat, live.lon]);
@@ -361,15 +362,16 @@ $("load-tles-btn").addEventListener("click", async () => {
   btn.disabled = true;
   btn.textContent = "Loading…";
   try {
-    const { satellites, source, ranked } = await api("/api/track/load", {
+    const { satellites, source, ranked, cached_fallback } = await api("/api/track/load", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ source: requested }),
     });
     renderSatelliteList(satellites, ranked);
-    if (source !== requested) {
+    if (source !== requested || cached_fallback) {
       $("tle-source-select").value = source;
-      alert(`${requested} didn't respond - loaded ${satellites.length} satellites from ${source} instead.`);
+      const note = cached_fallback ? " (from local cache, live fetch failed)" : "";
+      alert(`${requested} didn't respond - loaded ${satellites.length} satellites from ${source}${note} instead.`);
     }
   } catch (e) {
     alert("Failed to load satellites: " + e.message);
@@ -392,8 +394,7 @@ $("resort-tles-btn").addEventListener("click", async () => {
 });
 
 $("track-start-btn").addEventListener("click", async () => {
-  const select = $("satellite-select");
-  if (!select.value) return alert("Select a satellite first.");
+  if (selectedSatName === null) return alert("Select a satellite first.");
   try {
     // Min elevation / max distance only save on the input's blur ("change"
     // event) - if the user typed a value and clicked Start Tracking
@@ -401,10 +402,14 @@ $("track-start-btn").addEventListener("click", async () => {
     // reach the server and tracking would silently run under the old
     // (possibly unset) limits. Force a sync of whatever's in the fields now.
     await saveTrackSettings();
+    // Sent by name, not list position - resolved server-side against
+    // whatever's current there, since an auto-resort between render and
+    // this click could otherwise make an index point at a different
+    // satellite than the one actually selected.
     await api("/api/track/start", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ index: select.value }),
+      body: JSON.stringify({ name: selectedSatName }),
     });
   } catch (e) {
     alert("Could not start tracking: " + e.message);
@@ -512,6 +517,10 @@ $("save-observer-btn").addEventListener("click", async () => {
     });
     if (observerMarker) observerMarker.setLatLng([lat, lon]);
     if (observerMap) observerMap.panTo([lat, lon]);
+    // The Track tab's map (if it's been opened already) has its own
+    // separate dish-location pin that otherwise never finds out about a
+    // location change made from here.
+    if (dishLocationMarker) dishLocationMarker.setLatLng([lat, lon]);
     const badge = $("observer-saved");
     badge.hidden = false;
     setTimeout(() => (badge.hidden = true), 1500);
