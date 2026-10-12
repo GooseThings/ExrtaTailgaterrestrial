@@ -16,6 +16,17 @@
     </div>
   </header>
 
+  <section id="motion-monitor">
+    <label>Step size (°)
+      <input type="number" id="step-size" value="5" min="1" max="45" step="1">
+    </label>
+    <label>Tolerance (counts)
+      <input type="number" id="move-tolerance" value="20" min="5" max="500" step="5">
+    </label>
+    <span id="slip-badge" class="status-pill">No movement warnings</span>
+    <button id="clear-warnings-btn">Clear</button>
+  </section>
+
   <nav class="tabs">
     <button class="tab-btn active" data-tab="scan">Scan</button>
     <button class="tab-btn" data-tab="view">View Image</button>
