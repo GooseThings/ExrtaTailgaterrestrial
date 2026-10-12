@@ -64,6 +64,34 @@ def _step_targets(start, end, step):
     return targets
 
 
+def az_distance(a, b):
+    """Shortest angular distance between two azimuths (0-360, wraps at
+    North), e.g. az_distance(359, 1) == 2, not 358."""
+    return abs(((a - b + 180) % 360) - 180)
+
+
+def _step_targets_az(start, end, step):
+    """Like _step_targets, but takes the shorter way around through
+    0/360 (North) instead of always counting up or down - a dish slewing
+    from 350 to 10 should go 350 -> 360/0 -> 10 (20 degrees), not loop the
+    long way through 180 (340 degrees)."""
+    start = round(start) % 360
+    end = round(end) % 360
+    delta = ((end - start + 180) % 360) - 180  # shortest signed delta, (-180, 180]
+    if delta == 0:
+        return []
+    direction = 1 if delta > 0 else -1
+    remaining = abs(delta)
+    targets = []
+    pos = start
+    while remaining > 0:
+        move = min(step, remaining)
+        pos = (pos + direction * move) % 360
+        remaining -= move
+        targets.append(round(pos) % 360)
+    return targets
+
+
 def _cancelled(cancel_event):
     return cancel_event is not None and cancel_event.is_set()
 
@@ -99,7 +127,7 @@ def stepped_move(dish, axis, current_deg, target_deg,
     """
     if axis == 'az':
         move_cmd, query_cmd = 'azangle', 'azim'
-        target_deg = max(0, min(360, target_deg))
+        target_deg = target_deg % 360
     elif axis == 'el':
         move_cmd, query_cmd = 'elangle', 'elev'
         target_deg = max(MIN_ELEVATION, min(MAX_ELEVATION, target_deg))
@@ -107,11 +135,14 @@ def stepped_move(dish, axis, current_deg, target_deg,
         raise ValueError(f"Unknown axis: {axis}")
 
     step_size = max(1.0, step_size)
-    targets = _step_targets(current_deg, target_deg, step_size)
+    if axis == 'az':
+        targets = _step_targets_az(current_deg, target_deg, step_size)
+    else:
+        targets = _step_targets(current_deg, target_deg, step_size)
     if not targets:
         if not force:
             return target_deg
-        targets = [round(target_deg)]
+        targets = [round(target_deg) % 360 if axis == 'az' else round(target_deg)]
 
     settle = max(1.5, step_size * 0.15) + 1.0
 

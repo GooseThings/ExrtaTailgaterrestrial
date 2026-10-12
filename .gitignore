@@ -1,2 +1,6 @@
 __pycache__/
 *.pyc
+observer_location.json
+track_settings.json
+tle_cache.json
+space_track_credentials.json
