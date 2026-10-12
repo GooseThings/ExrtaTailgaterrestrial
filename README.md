@@ -87,9 +87,15 @@ Each scan produces three timestamped files:
 - `raw-data-<timestamp>.txt` — the raw signal-strength array
 - `scan-settings-<timestamp>.txt` — the az/el range and resolution used
 
-The scan always returns to its starting azimuth between elevation rows rather than sweeping back
-and forth — an earlier back-and-forth approach caused gear-meshing issues that distorted images,
-so a bit of speed was traded for accuracy.
+`dish_scan.py` always returns to its starting azimuth between elevation rows rather than sweeping
+back and forth — an earlier back-and-forth approach caused gear-meshing issues that distorted
+images, so a bit of speed was traded for accuracy.
+
+The web UI's low-res scan (`dish_web.py`) instead sweeps in a serpentine pattern (alternating
+direction each row) to cut down on wasted azimuth travel, and re-checks its actual position against
+the firmware's own target at each direction reversal — the point where gear lash is most likely to
+cause slip — logging a movement warning instead of silently distorting the image if it doesn't land
+cleanly.
 
 ## dish_image.py — turning a scan into a heatmap
 
