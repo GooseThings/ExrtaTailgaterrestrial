@@ -16,7 +16,7 @@ control panel.
 | `dish_scan.py` | CLI-driven sky scan — sweeps the dish across an az/el range and records RF signal strength at each point |
 | `dish_image.py` | Turns a saved scan into a heatmap image, with optional interpolation for smoother output |
 | `dish_track.py` | Real-time satellite tracker — pulls live TLE data and drives the dish to follow a satellite across the sky |
-| `dish_web.py` | Browser-based control panel combining scanning, image viewing, and tracking in one page |
+| `dish_web.py` | Browser-based control panel combining scanning, image viewing, satellite tracking with a live map, and location setup in one page |
 
 ## Hardware you'll need
 
@@ -60,7 +60,9 @@ but raw output (images, arrays) is in the dish's own reference frame. A common s
 the coax jack due North so azimuth increases across the Southern sky.
 
 Valid elevation range is roughly 5-70°; going outside that risks overrunning the motors, so every
-script clamps to it.
+script clamps to it. Azimuth moves (scans and tracking alike) take the shorter path through
+0°/360° rather than naive numeric stepping, so a move from 350° to 10° is a 20° slew, not 340° the
+long way around.
 
 ## dish_scan.py — scanning the sky
 
@@ -115,15 +117,44 @@ help pull detail out of noisy scans.
 python3 dish_track.py
 ```
 
-A small GUI: pick a TLE source from the dropdown (Celestrak's active-satellite catalogue, or AMSAT's
-amateur-satellite list if Celestrak is down or you're only after ham birds), click **Load**,
-**Connect** to open the dish's serial port, select a satellite, then **Track**. The dish will
-command `azangle`/`elangle` to follow it across the sky, waiting and auto-starting if the
-satellite is currently below the horizon.
+A small GUI: pick a TLE source from the dropdown, click **Load**, **Connect** to open the dish's
+serial port, select a satellite, then **Track**. The dish will command `azangle`/`elangle` to
+follow it across the sky, waiting and auto-starting if the satellite is currently below the
+horizon.
 
-Add more sources by editing `TLE_SOURCES` at the top of the file — any plain-text TLE feed
-(name/line1/line2 triples) works without further changes, since `fetch_tle_catalogue()` parses
-that format generically.
+Built-in TLE sources:
+
+| Source | Covers |
+|---|---|
+| Celestrak - Active Satellites | Celestrak's full curated active-satellite catalogue |
+| Celestrak - Stations | ISS and other crewed stations |
+| Celestrak - Visual (Brightest) | The ~100 brightest visible satellites |
+| Celestrak - Weather | Weather satellites |
+| Celestrak - GPS Operational | Operational GPS satellites |
+| Celestrak - Starlink | Starlink |
+| AMSAT - Amateur Satellites | Ham/amateur satellites only |
+| Space-Track - Active Satellites | The authoritative source Celestrak itself pulls from, on a different host |
+| Space-Track - Starlink | Starlink, from Space-Track |
+
+Celestrak runs its own abuse-protection firewall and can blacklist an IP outright (a silent
+connection timeout, not an HTTP error, so it can look like a hang) - if your pick fails, AMSAT
+(the one source here on a genuinely different host) is always tried next, before cycling through
+any other Celestrak-hosted group. The last successfully-fetched catalogue is cached to disk
+(`tle_cache.json`, gitignored) and reloaded automatically on startup, and used as a last-resort
+fallback if every live source fails.
+
+The two Space-Track sources need a free account
+([sign up here](https://www.space-track.org/auth/createAccount)) - create
+`space_track_credentials.json` next to the scripts (gitignored, never committed):
+
+```json
+{"username": "you@example.com", "password": "your-password"}
+```
+
+Add more sources by editing `TLE_SOURCES` (plain-text feeds) or `SPACE_TRACK_QUERIES` (another
+Space-Track query) at the top of `dish_track.py` - any plain-text TLE feed (name/line1/line2
+triples) works without further changes, since `fetch_tle_catalogue()` parses that format
+generically.
 
 Edit these constants at the top of the file for your setup:
 
@@ -134,16 +165,45 @@ OBSERVER_LON    = -85.68          # your longitude
 UPDATE_INTERVAL = 2.0             # seconds between position updates
 ```
 
+(The web UI below has its own Location tab for this instead of editing constants.)
+
 ## dish_web.py — everything in one browser tab
 
 ```
 python3 dish_web.py
 ```
 
-Then open http://localhost:5000. One page with three tabs — Scan, View Image, Track — sharing a
-single dish connection instead of juggling three scripts. Scan results are saved with the same
-filenames as `dish_scan.py`, so they immediately show up in the View tab. This is a local tool:
-the dev server only listens on `localhost` and isn't meant to be exposed to a network.
+Then open http://localhost:5000. One page sharing a single dish connection instead of juggling
+multiple scripts, across four tabs:
+
+- **Scan** — the same sky-scan as `dish_scan.py`'s low-res mode, but swept in a serpentine
+  pattern (alternating direction each row) to cut down on wasted azimuth travel, with a live
+  preview and a movement-warning badge that lights up if the dish doesn't land where commanded
+  (gear lash/slip on a worn drivetrain). Results are saved with the same filenames as
+  `dish_scan.py`, so they immediately show up in the View tab.
+- **View Image** — renders any saved scan (from either this or `dish_scan.py`) as a heatmap.
+- **Track** — load any of `dish_track.py`'s TLE sources (see above), with the satellite list
+  sorted by how soon each one clears your minimum elevation and auto-refreshing every 30s, plus a
+  live map showing the selected satellite's ground position, its projected ~100-minute ground
+  track, and a pin for your own location. Settings here let you set a minimum elevation (to clear
+  trees/obstructions) and a maximum tracking distance (too-far satellites won't have a usable
+  signal, so the dish won't bother slewing to them) - once a tracked pass drops below either, the
+  dish stops and reports why (`[BELOW X°]` / `[TOO FAR]`) instead of continuing to chase it. A
+  "show internet constellation sats" toggle controls whether Starlink/OneWeb/Kuiper/
+  Iridium/Globalstar/Orbcomm show up in the general lists (off by default, since they're not
+  usable for amateur radio - picking one of those constellations as the source directly always
+  shows it regardless of the toggle).
+- **Location** — click or drag a pin on a map to set where the dish is sitting, used for all the
+  pass/rise-time/az-el math above. Persisted to `observer_location.json` (gitignored), so it
+  survives a restart.
+
+A **Reboot Server** button in the header restarts the `dish_web.py` process itself from the
+browser - handy when you need to pick up a settings change without getting back to the machine.
+
+This is a local tool: the dev server only listens on `localhost` and isn't meant to be exposed to
+a network. There's no login/auth of any kind, so as defense in depth every state-changing request
+is rejected unless its Origin matches this server's own (blocks a drive-by CSRF form from some
+other open tab, not a determined attacker with real access to the machine).
 
 ## Examples
 
