@@ -11,3 +11,7 @@ calibration-*.json
 build/
 dist/
 *.spec
+
+# .deb build output (see build_deb.sh) - packaging/icon.png is committed,
+# it's the actual source asset, not a build artifact
+*.deb

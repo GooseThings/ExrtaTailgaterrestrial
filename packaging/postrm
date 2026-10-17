@@ -1,0 +1,14 @@
+#!/bin/sh
+# Only cleans up on purge (apt purge / dpkg --purge), not a plain remove -
+# standard Debian convention of leaving things alone unless the user asks
+# to wipe it fully. Only ever touches the app's own venv under /opt; each
+# user's own state under ~/.local/share/extratailgaterrestrial (settings,
+# saved scans, calibration results) is never touched by this package at
+# all, removal included - that's the user's own data, not this package's.
+set -e
+
+if [ "$1" = "purge" ]; then
+    rm -rf /opt/extratailgaterrestrial/.venv
+fi
+
+exit 0
