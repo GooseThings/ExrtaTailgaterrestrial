@@ -17,14 +17,23 @@ VENV="$APPDIR/.venv"
 # time), an existing venv built against the old version either can't find
 # its packages anymore or can't even run at all, and reusing it as-is
 # would leave the installed app broken in a way reinstalling the package
-# wouldn't fix, since this check would just as happily "find" it dependencies
-# and move on, never touching the actually-stale venv. Comparing against
-# the venv's own interpreter (not just whether the directory exists)
-# catches that and rebuilds instead of reusing a quietly broken one.
+# wouldn't fix, since this check would just as happily "find" its
+# dependencies and move on, never touching the actually-stale venv.
+#
+# Checked against pyvenv.cfg's recorded version, not by running the
+# venv's own bin/python3 - that's a symlink to the *unversioned*
+# /usr/bin/python3 (confirmed: readlink -f on a real installed venv
+# here resolves straight to /usr/bin/python3, not .../python3.13), which
+# a distro upgrade can repoint to a newer interpreter without touching
+# this venv at all. A live check through that symlink would then compare
+# the new interpreter against itself - a false "match" - while
+# site-packages is still laid out for the old one. pyvenv.cfg's version
+# line is written once at creation and never updated afterward, so it
+# reflects what the venv actually was built for.
 venv_python_matches_system() {
-    [ -x "$VENV/bin/python3" ] || return 1
+    [ -f "$VENV/pyvenv.cfg" ] || return 1
+    venv_ver="$(awk -F'= ' '/^version/ {print $2}' "$VENV/pyvenv.cfg" | cut -d. -f1,2)"
     sys_ver="$(python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])')"
-    venv_ver="$("$VENV/bin/python3" -c 'import sys; print("%d.%d" % sys.version_info[:2])' 2>/dev/null || true)"
     [ -n "$venv_ver" ] && [ "$venv_ver" = "$sys_ver" ]
 }
 
