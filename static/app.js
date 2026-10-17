@@ -676,12 +676,19 @@ function refreshCalibrateTab(calibrate, connected) {
     pill.classList.remove("connected", "disconnected");
   }
 
-  if (calibrate.running) {
+  // Keep showing the last known progress even after the run ends, not just
+  // while running - a status poll can land between the final point's "done"
+  // increment and "running" flipping to false, which would otherwise freeze
+  // the display short of 100% forever even though the run finished normally.
+  if (calibrate.running || calibrate.total > 0) {
     $("calibrate-current").textContent = calibrate.current_target || "—";
     $("calibrate-azel").textContent =
       calibrate.azimuth === null ? "—" : `${calibrate.azimuth.toFixed(1)}° / ${calibrate.elevation.toFixed(1)}°`;
     $("calibrate-signal").textContent = calibrate.signal === null ? "—" : calibrate.signal;
     $("calibrate-progress").textContent = `${calibrate.done} / ${calibrate.total}`;
+  }
+
+  if (calibrate.running) {
     refreshCalibrateLog();
     calibrateResultsRendered = false;
   } else if (!calibrateResultsRendered && calibrate.results && calibrate.results.length) {
