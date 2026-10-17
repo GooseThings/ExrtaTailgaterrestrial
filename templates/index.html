@@ -34,6 +34,7 @@
     <button class="tab-btn active" data-tab="scan">Scan</button>
     <button class="tab-btn" data-tab="view">View Image</button>
     <button class="tab-btn" data-tab="track">Track</button>
+    <button class="tab-btn" data-tab="calibrate">Calibrate</button>
     <button class="tab-btn" data-tab="location">Location</button>
   </nav>
 
@@ -129,6 +130,68 @@
             <div class="stat-row"><span>Speed</span><span id="sat-info-speed">—</span></div>
           </div>
           <div id="track-map"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-calibrate" class="tab-panel">
+      <p class="hint">
+        Points the dish at DISH Network's own Ku-band DBS slots - circularly polarized, 12.2-12.7 GHz,
+        the only thing the stock LNB can actually see - and raster-searches a small window around each
+        computed position for where the signal really peaks. The gap between theory and reality is your
+        pointing error; a consistent offset across several targets usually means the coax-jack-as-North
+        assumption (or the firmware's azangle/elangle zero-point) has drifted.
+      </p>
+      <div class="panel-grid">
+        <div>
+          <div id="calibrate-targets" class="stats-box">
+            <h3>Targets</h3>
+          </div>
+          <div class="button-row">
+            <label>Search margin (°) <input type="number" id="calibrate-margin" value="6" min="1" max="20" step="0.5"></label>
+            <label>Search step (°) <input type="number" id="calibrate-step" value="2" min="0.5" max="10" step="0.5"></label>
+          </div>
+          <div id="calibrate-estimate" class="hint"></div>
+          <div class="button-row">
+            <button id="calibrate-start-btn">Start Calibration</button>
+            <button id="calibrate-quick-btn">Quick Calibration</button>
+            <button id="calibrate-stop-btn" disabled>Stop</button>
+          </div>
+          <div id="calibrate-status" class="status-pill">Not running</div>
+          <p class="hint">Quick Calibration checks just the single highest-elevation visible target with a
+            tighter search window - a fast sanity check, not a full multi-target average.</p>
+
+          <div class="stats-box">
+            <h3>Pointing correction</h3>
+            <p class="hint">
+              Added to every target this tab aims at, before searching - so the error this run reports
+              becomes the <em>residual</em> error left over after correction. Run a calibration, watch
+              whether the residual shrinks toward zero, and refine.
+            </p>
+            <label>Az correction (°) <input type="number" id="az-correction" value="0" step="0.1"></label>
+            <label>El correction (°) <input type="number" id="el-correction" value="0" step="0.1"></label>
+            <div class="button-row">
+              <button id="save-correction-btn">Save Correction</button>
+              <button id="use-average-correction-btn" hidden>Use average error above</button>
+              <span id="correction-saved" class="status-pill" hidden>Saved</span>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="stats-box">
+            <h3>Progress</h3>
+            <div class="stat-row"><span>Current target</span><span id="calibrate-current">—</span></div>
+            <div class="stat-row"><span>Az / El</span><span id="calibrate-azel">—</span></div>
+            <div class="stat-row"><span>Signal</span><span id="calibrate-signal">—</span></div>
+            <div class="stat-row"><span>Progress</span><span id="calibrate-progress">—</span></div>
+          </div>
+          <table id="calibrate-results" class="results-table" hidden>
+            <thead><tr><th>Target</th><th>Az error</th><th>El error</th><th>Peak signal</th></tr></thead>
+            <tbody></tbody>
+            <tfoot></tfoot>
+          </table>
+          <pre id="calibrate-log"></pre>
         </div>
       </div>
     </section>

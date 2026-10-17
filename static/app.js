@@ -477,6 +477,226 @@ $("show-constellations").addEventListener("change", async () => {
   }
 });
 
+// ── Calibrate ────────────────────────────────────────────────────
+
+let calibrateTargetsCache = [];
+
+async function loadCalibrateTargets() {
+  try {
+    const { targets } = await api("/api/calibrate/targets");
+    calibrateTargetsCache = targets;
+    const box = $("calibrate-targets");
+    box.replaceChildren();
+    const h3 = document.createElement("h3");
+    h3.textContent = "Targets";
+    box.appendChild(h3);
+    targets.forEach((t) => {
+      const label = document.createElement("label");
+      label.className = "checkbox-label";
+      const input = document.createElement("input");
+      input.type = "checkbox";
+      input.className = "calibrate-target-checkbox";
+      input.value = t.lon;
+      input.checked = t.visible;
+      input.disabled = !t.visible;
+      label.appendChild(input);
+      label.appendChild(document.createTextNode(
+        ` ${t.label} — az ${t.az.toFixed(1)}°, el ${t.el.toFixed(1)}°` +
+          (t.visible ? "" : " (not visible from here)")
+      ));
+      box.appendChild(label);
+      input.addEventListener("change", updateCalibrateEstimate);
+    });
+    updateCalibrateEstimate();
+  } catch (e) {
+    /* connect/location may not be set up yet */
+  }
+}
+
+function selectedCalibrateTargets() {
+  return Array.from(document.querySelectorAll(".calibrate-target-checkbox:checked")).map((i) => parseFloat(i.value));
+}
+
+function updateCalibrateEstimate() {
+  const margin = parseFloat($("calibrate-margin").value) || 6;
+  const step = parseFloat($("calibrate-step").value) || 2;
+  const n = selectedCalibrateTargets().length;
+  const perAxis = Math.round((2 * margin) / step) + 1;
+  const points = n * perAxis * perAxis;
+  const minutes = (points * 1.2) / 60;
+  $("calibrate-estimate").textContent = n
+    ? `${n} target(s), ~${points} points total, ~${minutes.toFixed(1)} minutes`
+    : "Select at least one target.";
+}
+
+["calibrate-margin", "calibrate-step"].forEach((id) => $(id).addEventListener("change", updateCalibrateEstimate));
+
+async function startCalibration(targets, margin, step) {
+  try {
+    await api("/api/calibrate/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ targets, margin, step }),
+    });
+    $("calibrate-results").hidden = true;
+    $("use-average-correction-btn").hidden = true;
+  } catch (e) {
+    alert("Could not start calibration: " + e.message);
+  }
+}
+
+$("calibrate-start-btn").addEventListener("click", () => {
+  const targets = selectedCalibrateTargets();
+  if (targets.length === 0) return alert("Select at least one target first.");
+  startCalibration(targets, $("calibrate-margin").value, $("calibrate-step").value);
+});
+
+// Just the single best (highest-elevation, currently visible) target, with
+// a tighter window - a fast "is this still pointing where it should" check
+// instead of the full multi-target sweep.
+$("calibrate-quick-btn").addEventListener("click", () => {
+  const visible = calibrateTargetsCache.filter((t) => t.visible);
+  if (visible.length === 0) return alert("No currently-visible target to check against.");
+  const best = visible.reduce((a, b) => (b.el > a.el ? b : a));
+  startCalibration([best.lon], 4, 1.5);
+});
+
+$("calibrate-stop-btn").addEventListener("click", () => api("/api/calibrate/stop", { method: "POST" }));
+
+async function refreshCalibrateLog() {
+  try {
+    const { log } = await api("/api/calibrate/log");
+    const el = $("calibrate-log");
+    el.textContent = log.join("\n");
+    el.scrollTop = el.scrollHeight;
+  } catch (e) {
+    /* ignore */
+  }
+}
+
+function renderCalibrateResults(results) {
+  const table = $("calibrate-results");
+  const tbody = table.querySelector("tbody");
+  const tfoot = table.querySelector("tfoot");
+  tbody.replaceChildren();
+  tfoot.replaceChildren();
+
+  const found = results.filter((r) => r.found);
+  if (found.length === 0) {
+    table.hidden = true;
+    return;
+  }
+
+  const fmtSigned = (v) => `${v >= 0 ? "+" : ""}${v.toFixed(1)}°`;
+
+  found.forEach((r) => {
+    const tr = document.createElement("tr");
+    [r.label, fmtSigned(r.az_error), fmtSigned(r.el_error), String(r.peak_signal)].forEach((text) => {
+      const td = document.createElement("td");
+      td.textContent = text;
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+
+  const avgAz = found.reduce((s, r) => s + r.az_error, 0) / found.length;
+  const avgEl = found.reduce((s, r) => s + r.el_error, 0) / found.length;
+  const tr = document.createElement("tr");
+  [`Average (${found.length})`, fmtSigned(avgAz), fmtSigned(avgEl), ""].forEach((text) => {
+    const td = document.createElement("td");
+    td.innerHTML = `<strong>${text}</strong>`;
+    tr.appendChild(td);
+  });
+  tfoot.appendChild(tr);
+
+  table.hidden = false;
+
+  // Offered as a starting point, not applied automatically - the average is
+  // only meaningful before any correction is already in effect (this run's
+  // "error" is the *residual* once a correction is saved, so stacking
+  // another average on top of that would double-correct).
+  lastAvgError = { az: avgAz, el: avgEl };
+  $("use-average-correction-btn").hidden = false;
+}
+
+let lastAvgError = null;
+
+$("use-average-correction-btn").addEventListener("click", () => {
+  if (!lastAvgError) return;
+  const current = { az: parseFloat($("az-correction").value) || 0, el: parseFloat($("el-correction").value) || 0 };
+  $("az-correction").value = (current.az + lastAvgError.az).toFixed(1);
+  $("el-correction").value = (current.el + lastAvgError.el).toFixed(1);
+});
+
+async function loadCorrection() {
+  try {
+    const { az, el } = await api("/api/correction");
+    $("az-correction").value = az;
+    $("el-correction").value = el;
+  } catch (e) {
+    /* ignore */
+  }
+}
+
+$("save-correction-btn").addEventListener("click", async () => {
+  const az = parseFloat($("az-correction").value);
+  const el = parseFloat($("el-correction").value);
+  if (Number.isNaN(az) || Number.isNaN(el)) return alert("Enter valid az/el correction values.");
+  try {
+    await api("/api/correction", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ az, el }),
+    });
+    const badge = $("correction-saved");
+    badge.hidden = false;
+    setTimeout(() => (badge.hidden = true), 1500);
+  } catch (e) {
+    alert("Could not save correction: " + e.message);
+  }
+});
+
+let calibrateResultsRendered = false;
+
+function refreshCalibrateTab(calibrate, connected) {
+  $("calibrate-start-btn").disabled = !connected || calibrate.running;
+  $("calibrate-stop-btn").disabled = !calibrate.running;
+
+  const pill = $("calibrate-status");
+  if (calibrate.running) {
+    pill.textContent = `Running — ${calibrate.current_target || "…"}`;
+    pill.classList.add("connected");
+    pill.classList.remove("disconnected");
+  } else if (calibrate.error) {
+    pill.textContent = `Error: ${calibrate.error}`;
+    pill.classList.add("disconnected");
+    pill.classList.remove("connected");
+  } else {
+    pill.textContent = "Not running";
+    pill.classList.remove("connected", "disconnected");
+  }
+
+  // Keep showing the last known progress even after the run ends, not just
+  // while running - a status poll can land between the final point's "done"
+  // increment and "running" flipping to false, which would otherwise freeze
+  // the display short of 100% forever even though the run finished normally.
+  if (calibrate.running || calibrate.total > 0) {
+    $("calibrate-current").textContent = calibrate.current_target || "—";
+    $("calibrate-azel").textContent =
+      calibrate.azimuth === null ? "—" : `${calibrate.azimuth.toFixed(1)}° / ${calibrate.elevation.toFixed(1)}°`;
+    $("calibrate-signal").textContent = calibrate.signal === null ? "—" : calibrate.signal;
+    $("calibrate-progress").textContent = `${calibrate.done} / ${calibrate.total}`;
+  }
+
+  if (calibrate.running) {
+    refreshCalibrateLog();
+    calibrateResultsRendered = false;
+  } else if (!calibrateResultsRendered && calibrate.results && calibrate.results.length) {
+    renderCalibrateResults(calibrate.results);
+    calibrateResultsRendered = true;
+  }
+}
+
 // ── Location ─────────────────────────────────────────────────────
 
 let observerMap = null;
@@ -537,6 +757,7 @@ $("save-observer-btn").addEventListener("click", async () => {
     // separate dish-location pin that otherwise never finds out about a
     // location change made from here.
     if (dishLocationMarker) dishLocationMarker.setLatLng([lat, lon]);
+    loadCalibrateTargets();  // the slots' theoretical az/el depend on the dish's location
     const badge = $("observer-saved");
     badge.hidden = false;
     setTimeout(() => (badge.hidden = true), 1500);
@@ -616,7 +837,7 @@ async function refreshStatus() {
 
   setConnected(status.connected);
 
-  const busy = status.scan.running || status.track.running;
+  const busy = status.scan.running || status.track.running || status.calibrate.running;
   updateMotionControls(busy);
 
   $("scan-start-btn").disabled = !status.connected || status.scan.running;
@@ -635,6 +856,7 @@ async function refreshStatus() {
   trackPill.classList.toggle("disconnected", status.track.below_horizon);
 
   updateSlipBadge(status.motion);
+  refreshCalibrateTab(status.calibrate, status.connected);
 
   if (status.track.tle_fetched_at) {
     const agoText = formatAgo(Date.now() / 1000 - status.track.tle_fetched_at);
@@ -658,3 +880,5 @@ loadTleSources();
 loadMotionSettings();
 loadObserver();
 loadTrackSettings();
+loadCalibrateTargets();
+loadCorrection();
