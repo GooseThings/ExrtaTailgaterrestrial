@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=ExtraTailgaterrestrial
+Comment=Tailgater dish control panel - scan, track, and calibrate
+Exec=extratailgaterrestrial
+Icon=extratailgaterrestrial
+Terminal=false
+Categories=Utility;
+StartupWMClass=ExtraTailgaterrestrial
