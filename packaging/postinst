@@ -1,0 +1,78 @@
+#!/bin/sh
+# Runs after dpkg unpacks the package's files. Builds the app's own venv
+# here rather than shipping one in the .deb itself - a pre-built venv would
+# be tied to one exact Python build and bloat the package by a couple
+# hundred MB (mostly Qt/WebEngine), where installing it as Python wheels
+# at setup time is both smaller to ship and more portable. The tradeoff:
+# this step needs internet access and takes a few minutes the first time,
+# which apt won't show progress for - that's expected, not a hang.
+set -e
+
+APPDIR=/opt/extratailgaterrestrial
+VENV="$APPDIR/.venv"
+
+# A venv's site-packages lives under a version-specific path (e.g.
+# lib/python3.13/...) - if the system's default python3 changes between
+# installs (a distro upgrade, unrelated to this package, can do this any
+# time), an existing venv built against the old version either can't find
+# its packages anymore or can't even run at all, and reusing it as-is
+# would leave the installed app broken in a way reinstalling the package
+# wouldn't fix, since this check would just as happily "find" its
+# dependencies and move on, never touching the actually-stale venv.
+#
+# Checked against pyvenv.cfg's recorded version, not by running the
+# venv's own bin/python3 - that's a symlink to the *unversioned*
+# /usr/bin/python3 (confirmed: readlink -f on a real installed venv
+# here resolves straight to /usr/bin/python3, not .../python3.13), which
+# a distro upgrade can repoint to a newer interpreter without touching
+# this venv at all. A live check through that symlink would then compare
+# the new interpreter against itself - a false "match" - while
+# site-packages is still laid out for the old one. pyvenv.cfg's version
+# line is written once at creation and never updated afterward, so it
+# reflects what the venv actually was built for.
+venv_python_matches_system() {
+    [ -f "$VENV/pyvenv.cfg" ] || return 1
+    venv_ver="$(awk -F'= ' '/^version/ {print $2}' "$VENV/pyvenv.cfg" | cut -d. -f1,2)"
+    sys_ver="$(python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])')"
+    [ -n "$venv_ver" ] && [ "$venv_ver" = "$sys_ver" ]
+}
+
+if [ -d "$VENV" ] && ! venv_python_matches_system; then
+    echo "extratailgaterrestrial: system Python changed since this was last installed - rebuilding its environment..."
+    rm -rf "$VENV"
+fi
+
+if [ ! -d "$VENV" ]; then
+    echo "extratailgaterrestrial: setting up its Python environment (needs internet, a few minutes)..."
+    python3 -m venv "$VENV"
+fi
+
+"$VENV/bin/pip" install --quiet --upgrade pip
+"$VENV/bin/pip" install --quiet -r "$APPDIR/requirements.txt"
+"$VENV/bin/pip" install --quiet pywebview pyside6 qtpy
+
+chmod +x /usr/bin/extratailgaterrestrial
+
+if command -v gtk-update-icon-cache >/dev/null 2>&1; then
+    gtk-update-icon-cache -q -t -f /usr/share/icons/hicolor >/dev/null 2>&1 || true
+fi
+if command -v update-desktop-database >/dev/null 2>&1; then
+    update-desktop-database -q /usr/share/applications >/dev/null 2>&1 || true
+fi
+
+# Advisory only, same as install.sh for a from-source setup - the dish
+# shows up as /dev/ttyACM0, owned by root:dialout on Debian/Ubuntu, and a
+# user outside that group gets a confusing silent permission error the
+# first time the app tries to open it.
+if command -v getent >/dev/null 2>&1 && getent group dialout >/dev/null 2>&1; then
+    for u in $(getent passwd | awk -F: '$3 >= 1000 && $3 < 60000 {print $1}'); do
+        if ! id -nG "$u" 2>/dev/null | tr ' ' '\n' | grep -qx dialout; then
+            echo "extratailgaterrestrial: '$u' is not in the 'dialout' group, needed to open /dev/ttyACM0."
+            echo "  sudo usermod -aG dialout $u   (then that user needs to log out and back in)"
+        fi
+    done
+fi
+
+echo "extratailgaterrestrial: installed. Find it in the applications menu, or run: extratailgaterrestrial"
+
+exit 0

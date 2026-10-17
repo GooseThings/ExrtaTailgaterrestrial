@@ -1,0 +1,11 @@
+Package: extratailgaterrestrial
+Version: VERSION_PLACEHOLDER
+Section: hamradio
+Priority: optional
+Architecture: all
+Depends: python3 (>= 3.9), python3-venv, python3-pip
+Maintainer: GooseThings <noreply@github.com>
+Description: Tailgater dish control panel
+ Desktop app for controlling a repurposed Dish Network Tailgater antenna
+ over USB serial - sky scanning, real-time satellite tracking with a live
+ map, and Ku-band pointing calibration, all in one native window.
