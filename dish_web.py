@@ -1341,7 +1341,13 @@ def index():
     return render_template("index.html")
 
 
-if __name__ == "__main__":
+def run_server():
+    """Starts the Flask app on 127.0.0.1:5000, blocking until it stops.
+
+    Shared by running this file directly and by dish_app.py's native-window
+    wrapper, so both get the same reboot-retry handling below instead of
+    dish_app.py needing its own copy of it.
+    """
     # A reboot re-execs this same process right after answering the HTTP
     # request that triggered it - that request's own connection on port
     # 5000 can still be closing in the kernel at that instant, so the
@@ -1359,3 +1365,7 @@ if __name__ == "__main__":
             if attempt == 19:
                 raise
             time.sleep(0.5)
+
+
+if __name__ == "__main__":
+    run_server()

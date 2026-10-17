@@ -17,6 +17,7 @@ control panel.
 | `dish_image.py` | Turns a saved scan into a heatmap image, with optional interpolation for smoother output |
 | `dish_track.py` | Real-time satellite tracker — pulls live TLE data and drives the dish to follow a satellite across the sky |
 | `dish_web.py` | Browser-based control panel combining scanning, image viewing, satellite tracking with a live map, and location setup in one page |
+| `dish_app.py` | The same control panel as `dish_web.py`, opened in a native desktop window instead of a browser tab |
 
 ## Hardware you'll need
 
@@ -231,7 +232,28 @@ decoded content, which makes those slots good always-on calibration beacons even
 subscription at all. That's what the Calibrate tab (and the standalone `dish_calibrate.py`,
 runnable without the web UI - see its own `--help`) points at.
 
-### Standalone binary (no Python install needed)
+### Desktop window (dish_app.py) - not a browser
+
+```
+pip install pywebview pyside6 qtpy
+python3 dish_app.py
+```
+
+`dish_web.py`'s exact same Flask app, run in a background thread and opened in a real OS window
+via [pywebview](https://pywebview.flowrl.com/) - a title bar, a taskbar/dock entry, no address bar,
+nothing to type. `pywebview` auto-detects whatever's actually installed on the machine it runs on
+(WebKitGTK if present, Qt otherwise), which is why both get pulled in above - `pyside6`/`qtpy` are
+a pure pip install with no system packages needed, so this works the same way without `sudo` on any
+Linux box (and, down the line, on Windows). Already have WebKitGTK on this machine instead (common
+on many desktop Linux setups)? `sudo apt install python3-gi gir1.2-gtk-3.0 gir1.2-webkit2-4.1` (the
+WebKit package name varies a bit by distro version) gets picked up automatically too, and skips
+pulling in Qt/Chromium entirely.
+
+`dish_web.py` itself is unchanged and still runs the old way too (`python3 dish_web.py` + open the
+URL in any browser) - still the right choice headless (no desktop at all) or to reach the dish's UI
+from another device on the same network, like a phone, while this machine runs the server.
+
+### Standalone binary (no Python install needed, still browser-based)
 
 ```
 ./build_standalone.sh
@@ -239,17 +261,25 @@ runnable without the web UI - see its own `--help`) points at.
 
 Bundles `dish_web.py` and its `templates`/`static` assets into a single ~50MB executable at
 `dist/dish_web` via PyInstaller - copy that one file to another Linux machine and run it directly,
-no Python/pip/venv setup required there at all. It still reads/writes the usual state files
+no Python/pip/venv setup required there at all. This is still `dish_web.py`, not `dish_app.py` -
+you open a browser and go to `http://localhost:5000` same as running from source, just without
+needing Python installed on that machine. It still reads/writes the usual state files
 (`observer_location.json`, `track_settings.json`, etc.) relative to whatever directory it's run
-from, same as running from source, and still needs the same `dialout` group membership to open the
-serial port.
+from, and still needs the same `dialout` group membership to open the serial port.
 
-Windows isn't built yet, but is a real goal - two concrete things stand in the way: PyInstaller
-doesn't cross-compile, so an `.exe` needs this script run on an actual Windows machine; and
-`dish_web.py`'s server-reboot feature uses `subprocess.Popen(..., start_new_session=True)`, a
-POSIX-only option that would need a Windows equivalent (likely `CREATE_NEW_PROCESS_GROUP`). Serial
-port handling itself should already be fine either way - `pyserial` and every port field in this
-project take a plain string, so a `COM3`-style port should work without code changes.
+Bundling `dish_app.py` itself into a single executable is a real goal too, but a harder one -
+PyInstaller freezing a Qt/WebEngine or GTK/WebKit app correctly (locale files, the separate
+WebEngine process binary, etc.) is known to need more than `--add-data`, and wasn't attempted here
+yet.
+
+Windows isn't built yet either, but is a real goal - two concrete things stand in the way for
+`dish_web.py`'s standalone binary specifically: PyInstaller doesn't cross-compile, so an `.exe`
+needs this script run on an actual Windows machine; and `dish_web.py`'s server-reboot feature uses
+`subprocess.Popen(..., start_new_session=True)`, a POSIX-only option that would need a Windows
+equivalent (likely `CREATE_NEW_PROCESS_GROUP`). Serial port handling itself should already be fine
+either way - `pyserial` and every port field in this project take a plain string, so a `COM3`-style
+port should work without code changes. `dish_app.py` is a nearer-term, better bet for Windows
+specifically, since PySide6 ships native Windows wheels already.
 
 ## Examples
 
