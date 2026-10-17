@@ -8,6 +8,8 @@ or a browser.
 **Credit:** built on [Gabe Emerson / Saveitforparts's](https://youtu.be/lVOTZxNCgTM) original
 Tailgater serial-protocol reverse-engineering and scan pipeline (2023).
 
+![The Track tab: live satellite selection, ground track map, and dish status](images/screenshot.png)
+
 ## Hardware you'll need
 
 - A Dish Network "Tailgater" portable antenna with a USB port on the mainboard (tested on a 2014
