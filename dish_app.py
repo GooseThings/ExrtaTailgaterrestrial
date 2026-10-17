@@ -18,12 +18,24 @@
 #
 # Usage: python3 dish_app.py
 
+import atexit
 import sys
 import threading
 
 import webview
 
 import dish_web
+
+# Covers process exits that don't go through the window-closing event below
+# at all - Ctrl+C in the launching terminal, or closing that terminal,
+# which are just as normal a way to end a terminal-launched app as clicking
+# the window's own close button, but don't fire a GUI close event. Won't
+# help against a hard kill (SIGKILL), same limit as not being able to save
+# unsaved work if you pull the plug - nothing reasonably can. Registered
+# before the window even opens so it's in place for the whole run, and
+# calling it twice (this, then the window-closing handler on an orderly
+# close) is harmless - it's a clean no-op once nothing is left running.
+atexit.register(dish_web.stop_all_work)
 
 STARTUP_TIMEOUT = 15  # seconds to wait for the server to actually bind
 
