@@ -812,43 +812,67 @@ def api_calibrate_log():
         return jsonify({"log": list(state["calibrate"]["log"])})
 
 
+def _plan_calibration_target(label, sat_lon, observer, correction, margin, step):
+    """Works out where this target should actually be aimed (theoretical
+    position plus the saved correction) and the resulting search window,
+    or a skip reason if it's not reachable at all. Done as its own pass
+    before any move happens, so state["calibrate"]["total"] can reflect
+    the points that will really be sampled - a skipped target, or a
+    window clipped near the 5/70 boundary, both sample fewer than a full
+    margin x margin square - and so a correction that pushes the whole
+    window out of range is caught up front rather than mid-sweep."""
+    az_true, el_true = dish_calibrate.geostationary_az_el(observer["lat"], observer["lon"], sat_lon)
+    if not (dish_motion.MIN_ELEVATION <= el_true <= dish_motion.MAX_ELEVATION):
+        return {"label": label, "skip_reason":
+                f"computed elevation {el_true:.1f} is outside the dish's "
+                f"{dish_motion.MIN_ELEVATION}-{dish_motion.MAX_ELEVATION} range"}
+
+    az_dish = dish_track.dish_az_from_compass(az_true)
+    az_target = (az_dish + correction["az"]) % 360
+    el_target = el_true + correction["el"]
+    el_lo = max(dish_motion.MIN_ELEVATION, el_target - margin)
+    el_hi = min(dish_motion.MAX_ELEVATION, el_target + margin)
+    if el_lo > el_hi:
+        return {"label": label, "skip_reason":
+                f"the saved correction moves the search window entirely outside the dish's "
+                f"{dish_motion.MIN_ELEVATION}-{dish_motion.MAX_ELEVATION} range"}
+
+    points = len(dish_calibrate.frange(el_lo, el_hi, step)) * len(dish_calibrate.frange(az_target - margin, az_target + margin, step))
+    return {
+        "label": label, "az_true": az_true, "el_true": el_true, "az_dish": az_dish,
+        "az_target": az_target, "el_target": el_target, "el_lo": el_lo, "el_hi": el_hi,
+        "points": points,
+    }
+
+
 def _run_calibration(dish, targets, margin, step, stop_event):
     with state_lock:
         observer = dict(state["observer"])
         correction = dict(state["correction"])
 
-    steps_per_axis = round(2 * margin / step) + 1
+    plans = [_plan_calibration_target(label, sat_lon, observer, correction, margin, step)
+              for label, sat_lon in targets]
     with state_lock:
-        state["calibrate"]["total"] = len(targets) * steps_per_axis * steps_per_axis
+        state["calibrate"]["total"] = sum(p.get("points", 0) for p in plans)
 
     results = []
     try:
-        for label, sat_lon in targets:
+        for plan in plans:
             if stop_event.is_set():
                 break
 
+            label = plan["label"]
             with state_lock:
                 state["calibrate"]["current_target"] = label
 
-            az_true, el_true = dish_calibrate.geostationary_az_el(observer["lat"], observer["lon"], sat_lon)
-            log_calibrate(f"[{label}] theoretical: compass az {az_true:.1f}, el {el_true:.1f}")
-
-            if not (dish_motion.MIN_ELEVATION <= el_true <= dish_motion.MAX_ELEVATION):
-                log_calibrate(f"[{label}] computed elevation {el_true:.1f} is outside the dish's "
-                               f"{dish_motion.MIN_ELEVATION}-{dish_motion.MAX_ELEVATION} range - skipping.")
+            if "skip_reason" in plan:
+                log_calibrate(f"[{label}] {plan['skip_reason']} - skipping.")
                 results.append({"label": label, "found": False})
                 continue
 
-            az_dish = dish_track.dish_az_from_compass(az_true)
-
-            # The known pointing-correction offsets (from the Calibrate tab,
-            # typically filled in from a previous run's average error) shift
-            # where this run actually aims and centers its search - az_true/
-            # el_true/az_dish stay as the uncorrected ground truth used for
-            # error reporting below, so the reported error becomes the
-            # *residual* error remaining after correction, not the raw one.
-            az_target = (az_dish + correction["az"]) % 360
-            el_target = el_true + correction["el"]
+            az_true, az_dish = plan["az_true"], plan["az_dish"]
+            az_target, el_target = plan["az_target"], plan["el_target"]
+            log_calibrate(f"[{label}] theoretical: compass az {az_true:.1f}, el {plan['el_true']:.1f}")
             if correction["az"] or correction["el"]:
                 log_calibrate(f"[{label}] applying correction (az {correction['az']:+.1f}, "
                                f"el {correction['el']:+.1f}): aiming at az {az_target:.1f}, el {el_target:.1f}")
@@ -857,11 +881,10 @@ def _run_calibration(dish, targets, margin, step, stop_event):
             _safe_move(dish, 'el', el_target, cancel_event=stop_event)
 
             best_az_dish, best_el, best_signal = None, None, -1
-            el_lo = max(dish_motion.MIN_ELEVATION, el_target - margin)
-            el_hi = min(dish_motion.MAX_ELEVATION, el_target + margin)
+            signals = []
             forward = True
 
-            for el in dish_calibrate.frange(el_lo, el_hi, step):
+            for el in dish_calibrate.frange(plan["el_lo"], plan["el_hi"], step):
                 if stop_event.is_set():
                     break
                 _safe_move(dish, 'el', el, cancel_event=stop_event)
@@ -885,30 +908,44 @@ def _run_calibration(dish, targets, margin, step, stop_event):
                         state["calibrate"]["done"] += 1
                     log_calibrate(f"  az {az:6.1f}  el {el:5.1f}  signal: {signal if signal is not None else '(no reply)'}")
 
-                    if signal is not None and signal > best_signal:
-                        best_az_dish, best_el, best_signal = az, el, signal
+                    if signal is not None:
+                        signals.append(signal)
+                        if signal > best_signal:
+                            best_az_dish, best_el, best_signal = az, el, signal
 
             if stop_event.is_set():
                 break
 
-            if best_signal is None or best_signal <= 0:
-                log_calibrate(f"[{label}] no signal found in the search window - "
-                               f"not visible from here, or the window missed it.")
+            if not dish_calibrate.is_real_peak(best_signal, signals):
+                log_calibrate(f"[{label}] no clear peak in the search window - either not visible "
+                               f"from here, the window missed it, or the background was too "
+                               f"flat/noisy to tell a lock from no signal at all.")
                 results.append({"label": label, "found": False})
                 continue
 
             _safe_move(dish, 'az', best_az_dish, cancel_event=stop_event)  # park on the peak
             _safe_move(dish, 'el', best_el, cancel_event=stop_event)
 
-            best_az_true = dish_track.dish_az_from_compass(best_az_dish)  # self-inverse conversion
-            az_error = dish_calibrate.signed_angle_diff(best_az_true, az_true)
-            el_error = best_el - el_true
+            best_az_true = dish_track.dish_az_from_compass(best_az_dish)  # for display only
+            # Residual relative to the *corrected* aim (az_target/el_target),
+            # not the original uncorrected theoretical - comparing against
+            # the uncorrected baseline instead would re-report the same raw
+            # error every run regardless of how much correction had already
+            # been applied, so "use average as correction" would keep
+            # piling the same offset on top of itself instead of converging.
+            # And az needs to stay in dish-frame on both sides: converting
+            # to compass before comparing would flip its sign, since
+            # dish_az_from_compass is a reflection (CW vs CCW) rather than a
+            # plain offset - correcting by that number would then push the
+            # aim further from the peak, not closer.
+            az_error = dish_calibrate.signed_angle_diff(best_az_dish, az_target)
+            el_error = best_el - el_target
             log_calibrate(f"[{label}] peak signal {best_signal} at compass az {best_az_true:.1f}, "
-                           f"el {best_el:.1f}  (error: az {az_error:+.1f}, el {el_error:+.1f})")
+                           f"el {best_el:.1f}  (residual: az {az_error:+.1f}, el {el_error:+.1f})")
 
             results.append({
                 "label": label, "found": True,
-                "theoretical_az": az_true, "theoretical_el": el_true,
+                "theoretical_az": az_true, "theoretical_el": plan["el_true"],
                 "found_az": best_az_true, "found_el": best_el,
                 "az_error": az_error, "el_error": el_error,
                 "peak_signal": best_signal,
@@ -920,14 +957,24 @@ def _run_calibration(dish, targets, margin, step, stop_event):
             state["calibrate"]["error"] = str(e)
         log_calibrate(f"Error: {e}")
     finally:
-        timestr = time.strftime("%Y%m%d-%H%M%S")
-        out_file = f"calibration-{timestr}.json"
-        with open(out_file, "w") as f:
-            json.dump({
-                "observer": observer, "correction": correction,
-                "margin": margin, "step": step, "results": results,
-            }, f, indent=2)
+        out_file = None
+        try:
+            timestr = time.strftime("%Y%m%d-%H%M%S")
+            out_file = f"calibration-{timestr}.json"
+            with open(out_file, "w") as f:
+                json.dump({
+                    "observer": observer, "correction": correction,
+                    "margin": margin, "step": step, "results": results,
+                }, f, indent=2)
+        except OSError as e:
+            out_file = None
+            log_calibrate(f"Could not save results file: {e}")
 
+        # Cleanup always runs, even if the save above failed - otherwise a
+        # full disk or unwritable directory would leave "running" stuck
+        # True forever, permanently rejecting every later Start/Quick
+        # Calibration click with "already in progress" until the whole
+        # server process is restarted.
         with state_lock:
             state["calibrate"]["running"] = False
             state["calibrate"]["results"] = results

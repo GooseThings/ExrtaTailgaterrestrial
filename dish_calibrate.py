@@ -109,6 +109,23 @@ def frange(start, stop, step):
     return [start + (stop - start) * i / n for i in range(n + 1)]
 
 
+# How far the window's max has to stand out above its average before it's
+# trusted as an actual lock rather than a flat or noisy background - without
+# this, a window where every point reads similarly (open sky, RF noise, a
+# weak out-of-band signal) reports whichever point happened to read highest
+# as a confident "peak", including a bogus pointing error to go with it.
+PEAK_PROMINENCE = 1.1
+
+
+def is_real_peak(best_signal, signals):
+    """True if `best_signal` (the max of `signals`) stands out from the
+    window's average by at least PEAK_PROMINENCE."""
+    if not signals or best_signal is None or best_signal <= 0:
+        return False
+    avg = sum(signals) / len(signals)
+    return avg <= 0 or best_signal >= avg * PEAK_PROMINENCE
+
+
 # ────────────────────────────────────────────────────────────────
 # SERIAL HELPERS (same protocol as dish_web.py/dish_scan.py)
 # ────────────────────────────────────────────────────────────────
@@ -163,11 +180,14 @@ class Position:
 def search_peak(dish, pos, center_az_dish, center_el, margin, step, log):
     """Raster-scans a small window (dish-frame azimuth, true elevation)
     around the computed point, serpentine by row to cut down on travel,
-    and returns (best_az_dish, best_el, best_signal)."""
+    and returns (best_az_dish, best_el, best_signal, signals) - `signals`
+    is every valid reading taken, for is_real_peak() to judge the best one
+    against."""
     el_lo = max(dish_motion.MIN_ELEVATION, center_el - margin)
     el_hi = min(dish_motion.MAX_ELEVATION, center_el + margin)
 
     best_az, best_el, best_signal = None, None, -1
+    signals = []
     forward = True
     for el in frange(el_lo, el_hi, step):
         pos.move(dish, el=el)
@@ -184,10 +204,11 @@ def search_peak(dish, pos, center_az_dish, center_el, margin, step, log):
                 log(f"    az {az:6.1f}  el {el:5.1f}  signal: (no reply)")
                 continue
             log(f"    az {az:6.1f}  el {el:5.1f}  signal: {signal}")
+            signals.append(signal)
             if signal > best_signal:
                 best_az, best_el, best_signal = az, el, signal
 
-    return best_az, best_el, best_signal
+    return best_az, best_el, best_signal, signals
 
 
 def print_summary(results):
@@ -210,10 +231,10 @@ def print_summary(results):
     print()
     print("A consistent offset in the same direction across multiple targets points at")
     print("a systematic error - e.g. the coax jack isn't quite at true North, or the")
-    print("firmware's azangle/elangle zero-point has drifted - and the average above is")
-    print("a reasonable correction to apply to future compass-to-dish-angle conversions.")
-    print("Scatter with no consistent sign instead points at gear slip/backlash rather")
-    print("than a fixed calibration error.")
+    print("firmware's azangle/elangle zero-point has drifted. The average above is in the")
+    print("dish's own az/el frame - add it directly to a future dish_az_from_compass(...)")
+    print("result (and to elangle targets) to correct for it. Scatter with no consistent")
+    print("sign instead points at gear slip/backlash rather than a fixed calibration error.")
 
 
 def main():
@@ -277,19 +298,24 @@ def main():
                   f"(dish az {az_dish:.1f}deg)")
 
             pos.move(dish, az=az_dish, el=el_true)
-            best_az_dish, best_el, best_signal = search_peak(
+            best_az_dish, best_el, best_signal, signals = search_peak(
                 dish, pos, az_dish, el_true, args.margin, args.step, log=print)
 
-            if best_signal is None or best_signal <= 0:
-                print(f"  no signal found anywhere in the search window - this slot may not "
-                      f"be visible from here, or the window missed it (try a larger --margin).")
+            if not is_real_peak(best_signal, signals):
+                print(f"  no clear peak in the search window - this slot may not be visible from "
+                      f"here, the window missed it (try a larger --margin), or the background was "
+                      f"too flat/noisy to tell a lock from no signal at all.")
                 results.append({"label": label, "found": False})
                 continue
 
             pos.move(dish, az=best_az_dish, el=best_el)  # park on the peak before moving on
 
             best_az_true = dish_track.dish_az_from_compass(best_az_dish)  # self-inverse conversion
-            az_error = signed_angle_diff(best_az_true, az_true)
+            # Dish-frame on both sides, not compass - dish_az_from_compass is
+            # a reflection (CW vs CCW), not a plain offset, so comparing
+            # compass bearings here would report a sign-flipped error:
+            # correct by the same amount in the wrong direction.
+            az_error = signed_angle_diff(best_az_dish, az_dish)
             el_error = best_el - el_true
 
             print(f"  peak signal {best_signal} at compass az {best_az_true:.1f}deg, el {best_el:.1f}deg")

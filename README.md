@@ -45,6 +45,11 @@ Creates a `.venv`, installs everything in `requirements.txt` into it, and flags 
 account isn't in the `dialout` group yet (needed to open `/dev/ttyACM0` on Debian/Ubuntu). Prefer
 doing it by hand instead? `pip install -r requirements.txt` works the same way it always did.
 
+Every `python3 <script>.py` command below assumes that venv is active in your shell
+(`source .venv/bin/activate`) - without it, `python3` resolves to your system interpreter, which
+doesn't have any of this installed. No activation needed? Run `.venv/bin/python3 <script>.py`
+directly instead.
+
 1. Connect the dish via USB, and power it via the coax jack.
 2. Confirm the connection: `lsusb` should show "Microchip Technology, Inc. CDC RS-232 Emulation
    Demo", and `dmesg | grep tty` will show which port it landed on (usually `/dev/ttyACM0`).
