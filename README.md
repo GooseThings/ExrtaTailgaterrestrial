@@ -38,8 +38,17 @@ used throughout this code. Older firmware (e.g. some 2011 units) lacks `azangle`
 ## Quick start
 
 ```
-pip install -r requirements.txt
+./install.sh
 ```
+
+Creates a `.venv`, installs everything in `requirements.txt` into it, and flags it if your user
+account isn't in the `dialout` group yet (needed to open `/dev/ttyACM0` on Debian/Ubuntu). Prefer
+doing it by hand instead? `pip install -r requirements.txt` works the same way it always did.
+
+Every `python3 <script>.py` command below assumes that venv is active in your shell
+(`source .venv/bin/activate`) - without it, `python3` resolves to your system interpreter, which
+doesn't have any of this installed. No activation needed? Run `.venv/bin/python3 <script>.py`
+directly instead.
 
 1. Connect the dish via USB, and power it via the coax jack.
 2. Confirm the connection: `lsusb` should show "Microchip Technology, Inc. CDC RS-232 Emulation
@@ -174,7 +183,7 @@ python3 dish_web.py
 ```
 
 Then open http://localhost:5000. One page sharing a single dish connection instead of juggling
-multiple scripts, across four tabs:
+multiple scripts, across five tabs:
 
 - **Scan** — the same sky-scan as `dish_scan.py`'s low-res mode, but swept in a serpentine
   pattern (alternating direction each row) to cut down on wasted azimuth travel, with a live
@@ -193,6 +202,14 @@ multiple scripts, across four tabs:
   Iridium/Globalstar/Orbcomm show up in the general lists (off by default, since they're not
   usable for amateur radio - picking one of those constellations as the source directly always
   shows it regardless of the toggle).
+- **Calibrate** — points the dish at DISH Network's own Ku-band DBS slots (see "Testing/calibrating
+  without a subscription" below) and raster-searches a small window around each computed position
+  for where the signal actually peaks, reporting the gap between theory and reality as a pointing
+  check. A **Quick Calibration** option checks just the single best-elevation visible target with a
+  tighter window, for a fast sanity check instead of the full multi-target sweep. Az/el correction
+  offsets can be set here too - applied to where future calibration runs aim, so reported error
+  becomes the residual left after correction - and persist across restarts in
+  `pointing_correction.json` (gitignored).
 - **Location** — click or drag a pin on a map to set where the dish is sitting, used for all the
   pass/rise-time/az-el math above. Persisted to `observer_location.json` (gitignored), so it
   survives a restart.
@@ -204,6 +221,35 @@ This is a local tool: the dev server only listens on `localhost` and isn't meant
 a network. There's no login/auth of any kind, so as defense in depth every state-changing request
 is rejected unless its Origin matches this server's own (blocks a drive-by CSRF form from some
 other open tab, not a determined attacker with real access to the machine).
+
+### Testing/calibrating without a subscription
+
+The stock LNB is a DISH Network DBS unit - circularly polarized, fixed to 12.2-12.7 GHz - so the
+only things it can physically see are DISH/EchoStar's own satellites. Nearly all of that is
+encrypted pay content, but `rfwatch` only measures carrier presence at the tuner front-end, not
+decoded content, which makes those slots good always-on calibration beacons even with no
+subscription at all. That's what the Calibrate tab (and the standalone `dish_calibrate.py`,
+runnable without the web UI - see its own `--help`) points at.
+
+### Standalone binary (no Python install needed)
+
+```
+./build_standalone.sh
+```
+
+Bundles `dish_web.py` and its `templates`/`static` assets into a single ~50MB executable at
+`dist/dish_web` via PyInstaller - copy that one file to another Linux machine and run it directly,
+no Python/pip/venv setup required there at all. It still reads/writes the usual state files
+(`observer_location.json`, `track_settings.json`, etc.) relative to whatever directory it's run
+from, same as running from source, and still needs the same `dialout` group membership to open the
+serial port.
+
+Windows isn't built yet, but is a real goal - two concrete things stand in the way: PyInstaller
+doesn't cross-compile, so an `.exe` needs this script run on an actual Windows machine; and
+`dish_web.py`'s server-reboot feature uses `subprocess.Popen(..., start_new_session=True)`, a
+POSIX-only option that would need a Windows equivalent (likely `CREATE_NEW_PROCESS_GROUP`). Serial
+port handling itself should already be fine either way - `pyserial` and every port field in this
+project take a plain string, so a `COM3`-style port should work without code changes.
 
 ## Examples
 

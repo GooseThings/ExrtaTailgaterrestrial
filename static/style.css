@@ -197,3 +197,30 @@ main { padding: 20px; }
 }
 
 .checkbox-label input { width: auto !important; margin-top: 0 !important; }
+
+#calibrate-log {
+  max-height: 240px;
+  overflow-y: auto;
+  background: #11111b;
+  padding: 10px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+}
+
+#calibrate-targets .checkbox-label { margin-bottom: 6px; }
+
+.results-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0;
+  font-size: 0.85rem;
+}
+
+.results-table th, .results-table td {
+  text-align: left;
+  padding: 4px 8px;
+  border-bottom: 1px solid #45475a33;
+}
+
+.results-table tfoot td { border-top: 1px solid #45475a; border-bottom: none; }
