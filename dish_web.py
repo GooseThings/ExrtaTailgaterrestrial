@@ -579,9 +579,18 @@ def api_scan_stop():
 
 def _stop_scan():
     with state_lock:
+        thread = state["scan_thread"]
         stop_event = state["scan_stop"]
     if stop_event:
         stop_event.set()
+    if thread:
+        # Wait for it to actually finish (not just notice the stop) before
+        # returning - dish_app.py's window-close handler relies on this: in
+        # that entry point the server and this worker share one process, so
+        # exiting before the worker's own cleanup runs (which is what saves
+        # its output file) would lose it, unlike closing a browser tab on
+        # dish_web.py, where the separate server process keeps running.
+        thread.join(timeout=20)
 
 
 @app.route("/api/scan/preview.png")
@@ -801,9 +810,14 @@ def api_calibrate_stop():
 
 def _stop_calibrate():
     with state_lock:
+        thread = state["calibrate_thread"]
         stop_event = state["calibrate_stop"]
     if stop_event:
         stop_event.set()
+    if thread:
+        # See _stop_scan()'s comment - same reasoning, same reason it
+        # matters more now that dish_app.py can exit this same process.
+        thread.join(timeout=20)
 
 
 @app.route("/api/calibrate/log")
@@ -1341,30 +1355,60 @@ def index():
     return render_template("index.html")
 
 
-def run_server():
+def stop_all_work():
+    """Requests cancellation of any running scan/calibrate/track work and
+    blocks until each has actually finished, not just been told to.
+
+    Used by dish_app.py's window-close handler. Closing a browser tab on
+    dish_web.py never risked anything, since the server is a separate,
+    independently long-lived process - but dish_app.py's window and the
+    server share one process, so letting that process exit while work is
+    still running would kill it before its own cleanup (which is what
+    saves a scan's or calibration's results) ever runs.
+    """
+    _stop_scan()
+    _stop_calibrate()
+    _stop_track()
+
+
+def run_server(ready_event=None):
     """Starts the Flask app on 127.0.0.1:5000, blocking until it stops.
 
     Shared by running this file directly and by dish_app.py's native-window
     wrapper, so both get the same reboot-retry handling below instead of
     dish_app.py needing its own copy of it.
+
+    If given, `ready_event` is set once the port is actually bound by
+    *this* process, right before it starts serving - lets a caller (only
+    dish_app.py does) wait for a real successful bind instead of guessing
+    from whether something, anything, answers on the port, which can't
+    tell "our server came up" apart from "some unrelated process already
+    owns this port, so of course it answers".
     """
+    from werkzeug.serving import make_server
+
     # A reboot re-execs this same process right after answering the HTTP
     # request that triggered it - that request's own connection on port
     # 5000 can still be closing in the kernel at that instant, so the
     # first bind() here can transiently fail with "Address already in
     # use" even though nothing is actually still listening. Retry instead
     # of dying on it.
+    server = None
     for attempt in range(20):
         try:
-            app.run(host="127.0.0.1", port=5000, threaded=True)
+            server = make_server("127.0.0.1", 5000, app, threaded=True)
             break
         except (OSError, SystemExit):
-            # Werkzeug catches the bind failure itself and calls
-            # sys.exit(1) rather than letting an OSError propagate, so
-            # SystemExit has to be caught here too.
+            # make_server()'s bind failure path (shared with app.run()'s)
+            # catches the OSError itself and calls sys.exit(1) rather than
+            # letting it propagate, so SystemExit has to be caught here too.
             if attempt == 19:
                 raise
             time.sleep(0.5)
+
+    if ready_event is not None:
+        ready_event.set()
+    server.serve_forever()
 
 
 if __name__ == "__main__":

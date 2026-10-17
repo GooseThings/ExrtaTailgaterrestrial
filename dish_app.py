@@ -18,12 +18,41 @@
 #
 # Usage: python3 dish_app.py
 
+import sys
 import threading
 
 import webview
 
 import dish_web
 
-threading.Thread(target=dish_web.run_server, daemon=True).start()
-webview.create_window("ExtraTailgaterrestrial", "http://127.0.0.1:5000", width=1280, height=900)
-webview.start()
+STARTUP_TIMEOUT = 15  # seconds to wait for the server to actually bind
+
+
+def main():
+    ready = threading.Event()
+    threading.Thread(target=dish_web.run_server, args=(ready,), daemon=True).start()
+
+    # Waiting for a real successful bind (not just "something answers on
+    # port 5000") matters here specifically: the server and this window
+    # share one process, so if some other program already owns that port,
+    # opening the window anyway would show *that* program's page while
+    # this process's own server thread quietly gives up in the background
+    # - confusing either way, so fail loudly here instead.
+    if not ready.wait(timeout=STARTUP_TIMEOUT):
+        print(f"dish_web's server didn't come up within {STARTUP_TIMEOUT}s - "
+              f"is another program already using port 5000? "
+              f"(check with: ss -ltnp | grep 5000)", file=sys.stderr)
+        sys.exit(1)
+
+    window = webview.create_window(
+        "ExtraTailgaterrestrial", "http://127.0.0.1:5000", width=1280, height=900)
+    # Closing this window ends the process - make sure anything still
+    # running (a scan, a calibration pass) actually stops and saves first,
+    # the same way it always would if the dish were disconnected from the
+    # web UI, rather than being killed mid-flight by the process exiting.
+    window.events.closing += dish_web.stop_all_work
+    webview.start()
+
+
+if __name__ == "__main__":
+    main()
