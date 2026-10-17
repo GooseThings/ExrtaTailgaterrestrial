@@ -93,5 +93,5 @@ dpkg-deb --build --root-owner-group "$STAGE" "$OUT"
 echo
 echo "Done: $OUT"
 echo "Install:   sudo apt install ./$OUT"
-echo "Remove:    sudo apt remove $PKG        (keeps nothing it created)"
-echo "Purge:     sudo apt purge $PKG         (also drops its venv)"
+echo "Remove:    sudo apt remove $PKG        (keeps its venv and your settings/scans)"
+echo "Purge:     sudo apt purge $PKG         (removes its venv; still keeps your settings/scans)"

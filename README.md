@@ -266,8 +266,8 @@ project logo to use), and `extratailgaterrestrial` works as a plain command too.
 normal way:
 
 ```
-sudo apt remove extratailgaterrestrial    # keeps nothing behind
-sudo apt purge extratailgaterrestrial     # also drops its venv
+sudo apt remove extratailgaterrestrial    # keeps its venv and your settings/scans
+sudo apt purge extratailgaterrestrial     # removes its venv; still keeps your settings/scans
 ```
 
 A few things worth knowing about what this actually does:

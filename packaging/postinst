@@ -11,8 +11,30 @@ set -e
 APPDIR=/opt/extratailgaterrestrial
 VENV="$APPDIR/.venv"
 
+# A venv's site-packages lives under a version-specific path (e.g.
+# lib/python3.13/...) - if the system's default python3 changes between
+# installs (a distro upgrade, unrelated to this package, can do this any
+# time), an existing venv built against the old version either can't find
+# its packages anymore or can't even run at all, and reusing it as-is
+# would leave the installed app broken in a way reinstalling the package
+# wouldn't fix, since this check would just as happily "find" it dependencies
+# and move on, never touching the actually-stale venv. Comparing against
+# the venv's own interpreter (not just whether the directory exists)
+# catches that and rebuilds instead of reusing a quietly broken one.
+venv_python_matches_system() {
+    [ -x "$VENV/bin/python3" ] || return 1
+    sys_ver="$(python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])')"
+    venv_ver="$("$VENV/bin/python3" -c 'import sys; print("%d.%d" % sys.version_info[:2])' 2>/dev/null || true)"
+    [ -n "$venv_ver" ] && [ "$venv_ver" = "$sys_ver" ]
+}
+
+if [ -d "$VENV" ] && ! venv_python_matches_system; then
+    echo "extratailgaterrestrial: system Python changed since this was last installed - rebuilding its environment..."
+    rm -rf "$VENV"
+fi
+
 if [ ! -d "$VENV" ]; then
-    echo "extratailgaterrestrial: setting up its Python environment (first install only, needs internet, a few minutes)..."
+    echo "extratailgaterrestrial: setting up its Python environment (needs internet, a few minutes)..."
     python3 -m venv "$VENV"
 fi
 
