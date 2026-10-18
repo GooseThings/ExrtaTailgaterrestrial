@@ -45,7 +45,7 @@ install -m 755 packaging/postrm "$STAGE/DEBIAN/postrm"
 APPDIR="$STAGE/opt/$PKG"
 mkdir -p "$APPDIR"
 cp dish_app.py dish_web.py dish_track.py dish_motion.py dish_calibrate.py \
-   dish_image.py dish_scan.py requirements.txt "$APPDIR/"
+   dish_image.py dish_scan.py dish_time.py requirements.txt "$APPDIR/"
 cp -r templates static "$APPDIR/"
 
 mkdir -p "$STAGE/usr/bin"

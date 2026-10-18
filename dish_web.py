@@ -25,6 +25,7 @@ from PIL import Image
 import dish_calibrate
 import dish_image
 import dish_motion
+import dish_time
 import dish_track
 
 app = Flask(__name__)
@@ -425,6 +426,21 @@ def api_move():
     finally:
         dish_io_lock.release()
     return jsonify({"ok": True, "target_deg": achieved})
+
+
+_clock_cache = {"result": None, "at": 0.0}
+_clock_lock = threading.Lock()
+
+
+@app.route("/api/clock")
+def api_clock():
+    """Local clock vs an NTS time server. Cached for a minute so several
+    open pages don't each hit the network."""
+    with _clock_lock:
+        if _clock_cache["result"] is None or time.time() - _clock_cache["at"] > 60:
+            _clock_cache["result"] = dish_time.check_clock()
+            _clock_cache["at"] = time.time()
+        return jsonify(_clock_cache["result"])
 
 
 @app.route("/api/signal")

@@ -401,7 +401,32 @@ function renderTrackPath(points) {
   );
 }
 
+let lastLive = null;
+let lastStatusPosition = null;
+
+// Dish az is 360 - compass az (see dish_az_from_compass).
+function updateDishLag() {
+  const pos = lastStatusPosition;
+  if (!pos || pos.az === null || pos.el === null) {
+    $("dish-stat-compass").textContent = "—";
+    $("dish-stat-lag").textContent = "—";
+    return;
+  }
+  const compass = (360 - pos.az) % 360;
+  $("dish-stat-compass").textContent = `${compass.toFixed(1)}°`;
+  if (!lastLive) {
+    $("dish-stat-lag").textContent = "—";
+    return;
+  }
+  let dAz = lastLive.az - compass;
+  dAz = ((dAz + 540) % 360) - 180;
+  const dEl = lastLive.el - pos.el;
+  $("dish-stat-lag").textContent = `Az ${dAz >= 0 ? "+" : ""}${dAz.toFixed(1)}°, El ${dEl >= 0 ? "+" : ""}${dEl.toFixed(1)}°`;
+}
+
 function updateSatInfo(live) {
+  lastLive = live;
+  updateDishLag();
   $("sat-info-name").textContent = live.name;
   $("sat-info-id").textContent = live.norad_id || "—";
   $("sat-info-az").textContent = live.az.toFixed(1) + "°";
@@ -432,7 +457,7 @@ $("satellite-select").addEventListener("change", () => {
   refreshTrackLive();
 });
 
-setInterval(refreshTrackLive, 3000);
+setInterval(refreshTrackLive, 1000);
 
 $("load-tles-btn").addEventListener("click", async () => {
   const btn = $("load-tles-btn");
@@ -934,6 +959,8 @@ async function refreshStatus() {
 
   $("dish-stat-conn").textContent = status.connected ? `Connected (${status.port})` : "Disconnected";
   const pos = status.motion.position;
+  lastStatusPosition = pos;
+  updateDishLag();
   $("dish-stat-az").textContent = pos.az === null ? "unknown" : `${pos.az.toFixed(1)}°`;
   $("dish-stat-el").textContent = pos.el === null ? "unknown" : `${pos.el.toFixed(1)}°`;
   $("dish-stat-step").textContent = `${status.motion.step_size}° / ${status.motion.tolerance} counts`;
@@ -949,3 +976,27 @@ loadObserver();
 loadTrackSettings();
 loadCalibrateTargets();
 loadCorrection();
+
+// ── Clock check (satellite az/el depends on the local clock) ─────
+
+async function checkClock() {
+  const el = $("clock-stat");
+  try {
+    const r = await api("/api/clock");
+    if (!r.ok) {
+      el.textContent = "check failed";
+      el.title = r.error;
+      return;
+    }
+    const ms = Math.round(r.offset_s * 1000);
+    el.textContent = `${r.in_sync ? "OK" : "OFF"}: ${ms >= 0 ? "+" : ""}${ms} ms`;
+    el.title = `NTS server ${r.server}, round trip ${r.rtt_ms.toFixed(0)} ms. `
+      + "Positive means this computer's clock is behind.";
+    el.style.color = r.in_sync ? "var(--good)" : "var(--bad)";
+  } catch (e) {
+    el.textContent = "check failed";
+    el.title = e.message;
+  }
+}
+checkClock();
+setInterval(checkClock, 5 * 60 * 1000);

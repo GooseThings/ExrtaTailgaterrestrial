@@ -411,10 +411,9 @@ class TrackingThread(threading.Thread):
                         if self.on_position:
                             self.on_position(achieved_az, achieved_el)
 
-                    self.callback(
-                        f"Az: {az:.1f}° | El: {el:.1f}° | Dist: {dist:.0f} km",
-                        False
-                    )
+                    # Numbers are shown in the sat info pane (one source, one
+                    # clock); this badge just says what is being tracked.
+                    self.callback(f"Tracking {self.tracker.name}", False)
 
             except serial.SerialException:
                 self.callback("Serial disconnected — stopping", False)
