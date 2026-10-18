@@ -673,7 +673,7 @@ def _run_scan(dish, az_start, az_end, el_start, el_end, resolution, stop_event):
                 if stop_event.is_set():
                     break
                 if elevation != el_start:
-                    send_command(dish, f"elangle {elevation}")
+                    send_command(dish, dish_motion.move_command('el', elevation)[0])
                     time.sleep(2)
 
                 if ascending:
@@ -686,7 +686,7 @@ def _run_scan(dish, az_start, az_end, el_start, el_end, resolution, stop_event):
                 for i, azimuth in enumerate(az_sequence):
                     if stop_event.is_set():
                         break
-                    send_command(dish, f"azangle {azimuth}")
+                    send_command(dish, dish_motion.move_command('az', azimuth)[0])
                     signal_strength = read_signal_strength(dish, stop_event)
                     if signal_strength is None:
                         break

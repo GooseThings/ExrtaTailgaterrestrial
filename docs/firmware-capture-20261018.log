@@ -1,0 +1,1612 @@
+
+===== >>> ''
+
+GO>
+
+===== >>> '?'
+?
+Unknown command, sorry...
+
+GO>
+
+===== >>> 'help'
+help
+
+           help        Prints this command list
+            ver        Prints console version number
+           elev        Raise / lower dish to target elevation
+         elevmt        Raise / lower dish to target elevation, and maintain
+      elevwatch        Monitor the reported elevation
+        elangle        Move to given elevation angle
+        elnudge        Nudge the elevation up or down by approx 0.2 deg
+          elacc        Raise / lower dish to target elevation accuarate
+           azim        Rotate dish to target heading
+      azimwatch        Monitor the reported heading
+        azangle        Move to given azimuth angle
+        aznudge        Nudge the azimuth motor clockwise or counterclockwise by approx 0.2 deg
+          azacc        Move to given azimuth angle
+        rfwatch        Monitor reported rf signal strength
+            cal        Calibrate tilt sensor
+           scan        Starts or stops a scan for RF at current elevation
+            gps        Store terrestrial location
+           stat        Statistic function testing
+         nvread        Read NVRAM
+        nvwrite        Write NVRAM
+          reset        Reset the system
+
+
+GO>
+
+===== >>> 'ver'
+ver
+Version: $Id: pragelato.h 704 2013-08-09 03:41:27Z rudrava $
+
+GO>
+
+===== >>> 'help azangle'
+help azangle
+
+           help        Prints this command list
+            ver        Prints console version number
+           elev        Raise / lower dish to target elevation
+         elevmt        Raise / lower dish to target elevation, and maintain
+      elevwatch        Monitor the reported elevation
+        elangle        Move to given elevation angle
+        elnudge        Nudge the elevation up or down by approx 0.2 deg
+          elacc        Raise / lower dish to target elevation accuarate
+           azim        Rotate dish to target heading
+      azimwatch        Monitor the reported heading
+        azangle        Move to given azimuth angle
+        aznudge        Nudge the azimuth motor clockwise or counterclockwise by approx 0.2 deg
+          azacc        Move to given azimuth angle
+        rfwatch        Monitor reported rf signal strength
+            cal        Calibrate tilt sensor
+           scan        Starts or stops a scan for RF at current elevation
+            gps        Store terrestrial location
+           stat        Statistic function testing
+         nvread        Read NVRAM
+        nvwrite        Write NVRAM
+          reset        Reset the system
+
+
+GO>
+
+===== >>> 'help nvread'
+help nvread
+
+           help        Prints this command list
+            ver        Prints console version number
+           elev        Raise / lower dish to target elevation
+         elevmt        Raise / lower dish to target elevation, and maintain
+      elevwatch        Monitor the reported elevation
+        elangle        Move to given elevation angle
+        elnudge        Nudge the elevation up or down by approx 0.2 deg
+          elacc        Raise / lower dish to target elevation accuarate
+           azim        Rotate dish to target heading
+      azimwatch        Monitor the reported heading
+        azangle        Move to given azimuth angle
+        aznudge        Nudge the azimuth motor clockwise or counterclockwise by approx 0.2 deg
+          azacc        Move to given azimuth angle
+        rfwatch        Monitor reported rf signal strength
+            cal        Calibrate tilt sensor
+           scan        Starts or stops a scan for RF at current elevation
+            gps        Store terrestrial location
+           stat        Statistic function testing
+         nvread        Read NVRAM
+        nvwrite        Write NVRAM
+          reset        Reset the system
+
+
+GO>
+
+===== >>> 'elev'
+elev
+Current elevation: 1455
+
+GO>
+
+===== >>> 'azim'
+azim
+Current heading:       4341
+
+GO>
+
+===== >>> 'rfwatch 1'
+rfwatch 1
+Current rfss:           [5D3271 [5D3270 [5D3273 [5D3273 [5D3274 [5D3276 [5D3272 [5D3271 [5D3272 [5D3272 [5D3274 [5D3274 [5D3272 [5D3272 [5D3272 [5D3272 [5D3273 [5D3273 [5D3273 [5D3272 
+
+GO>
+
+===== >>> 'elevwatch 1'
+elevwatch 1
+
+===== >>> 'azimwatch 1'
+Average: 1455.00, SD: 0.00, Max: 1455, Min: 1455
+
+GO>
+azimwatch 1
+
+===== >>> 'nvread'
+Average: 4339.35, SD: 1.87, Max: 4343, Min: 4336
+
+GO>
+nvread
+Specify <structID>, <offset>, and <count>
+
+GO>
+
+===== >>> 'nvread 0 0 64'
+nvread 0 0 64
+Count reduced to 24
+0x00 0x00 0xcc 0x41 0x33 0x33 0x37 0x42 0x98 0x09 
+0x9a 0x03 0x00 0x00 0xf1 0x08 0x57 0x03 0x00 0x00 
+0x48 0x08 0xfa 0x02 
+
+GO>
+
+===== >>> 'nvread 1 0 64'
+nvread 1 0 64
+Count reduced to 24
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 
+
+GO>
+
+===== >>> 'nvread 2 0 64'
+nvread 2 0 64
+Count reduced to 24
+Read failed
+
+GO>
+
+===== >>> 'nvread 3 0 64'
+nvread 3 0 64
+Count reduced to 24
+Read failed
+
+GO>
+
+===== >>> 'nvread 4 0 64'
+nvread 4 0 64
+Count reduced to 24
+Read failed
+
+GO>
+
+===== >>> 'nvread 5 0 64'
+nvread 5 0 64
+Count reduced to 24
+Read failed
+
+GO>
+
+===== >>> 'nvread 6 0 64'
+nvread 6 0 64
+Count reduced to 24
+Read failed
+
+GO>
+
+===== >>> 'nvread 7 0 64'
+nvread 7 0 64
+Count reduced to 24
+Read failed
+
+GO>
+
+===== >>> 'nvread 8 0 64'
+nvread 8 0 64
+Count reduced to 24
+Read failed
+
+GO>
+
+===== >>> 'nvread 9 0 64'
+nvread 9 0 64
+Count reduced to 24
+Read failed
+
+GO>
+
+===== >>> 'nvread 10 0 64'
+nvread 10 0 64
+Count reduced to 24
+Read failed
+
+GO>
+
+===== >>> 'nvread 11 0 64'
+nvread 11 0 64
+Count reduced to 24
+Read failed
+
+GO>
+
+===== >>> 'nvread 12 0 64'
+nvread 12 0 64
+Count reduced to 24
+Read failed
+
+GO>
+
+===== >>> 'nvread 13 0 64'
+nvread 13 0 64
+Count reduced to 24
+Read failed
+
+GO>
+
+===== >>> 'nvread 14 0 64'
+nvread 14 0 64
+Count reduced to 24
+Read failed
+
+GO>
+
+===== >>> 'nvread 15 0 64'
+nvread 15 0 64
+Count reduced to 24
+Read failed
+
+GO>
+
+===== >>> 'nvread 0 20 24'
+nvread 0 20 24
+0x48 0x08 0xfa 0x02 0x00 0x00 0xd8 0x0e 0xe8 0x03 
+0x01 0x00 0xff 0xff 0x00 0x00 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 
+
+GO>
+
+===== >>> 'nvread 0 24 4'
+nvread 0 24 4
+0x00 0x00 0xd8 0x0e 
+
+GO>
+
+===== >>> 'nvread 1 24 4'
+nvread 1 24 4
+0xff 0xff 0xff 0xff 
+
+GO>
+
+===== >>> 'elevwatch 1'
+elevwatch 1
+
+===== >>> 'azimwatch 1'
+Average: 1455.00, SD: 0.00, Max: 1455, Min: 1455
+
+GO>
+azimwatch 1
+
+===== >>> 'aznudge'
+aznudge
+Please specify a direction (cw or ccw)
+
+GO>
+
+===== >>> 'elnudge'
+elnudge
+Please specify a direction (up or down)
+
+GO>
+
+===== >>> 'elev 1455'
+elev 1455
+target: 1455    current: 1455
+
+GO>
+Stopped at El: 1455
+
+===== >>> 'azim 4340'
+azim 4340
+target:       4340    current:       4336
+
+GO>
+Stopped at Az: 4341
+
+===== >>> 'elev'
+elev
+Current elevation: 1455
+
+GO>
+
+===== >>> 'azim'
+azim
+Current heading:       4339
+
+GO>
+
+===== >>> 'elevwatch 1'
+elevwatch 1
+
+===== >>> 'elevwatch 3'
+elevwatch 3
+
+===== >>> 'nvread 0 0 24'
+nvread 0 0 24
+0x00 0x00 0xcc 0x41 0x33 0x33 0x37 0x42 0x98 0x09 
+0x9a 0x03 0x00 0x00 0xf1 0x08 0x57 0x03 0x00 0x00 
+0x48 0x08 0xfa 0x02 
+
+GO>
+
+===== >>> 'nvread 0 24 24'
+nvread 0 24 24
+0x00 0x00 0xd8 0x0e 0xe8 0x03 0x01 0x00 0xff 0xff 
+0x00 0x00 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 
+
+GO>
+
+===== >>> 'nvread 0 48 24'
+nvread 0 48 24
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 
+
+GO>
+
+===== >>> 'nvread 0 72 24'
+nvread 0 72 24
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 
+
+GO>
+
+===== >>> 'nvread 0 96 24'
+nvread 0 96 24
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 
+
+GO>
+
+===== >>> 'nvread 0 120 24'
+nvread 0 120 24
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 
+
+GO>
+
+===== >>> 'nvread 0 144 24'
+nvread 0 144 24
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 
+
+GO>
+
+===== >>> 'nvread 0 168 24'
+nvread 0 168 24
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 
+
+GO>
+
+===== >>> 'nvread 0 192 24'
+nvread 0 192 24
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 
+
+GO>
+
+===== >>> 'nvread 0 216 24'
+nvread 0 216 24
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 
+
+GO>
+
+===== >>> 'nvread 0 240 24'
+nvread 0 240 24
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 
+
+GO>
+
+===== >>> 'nvread 0 264 24'
+nvread 0 264 24
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 
+
+GO>
+
+===== >>> 'nvread 0 288 24'
+nvread 0 288 24
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 
+
+GO>
+
+===== >>> 'nvread 0 312 24'
+nvread 0 312 24
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 
+
+GO>
+
+===== >>> 'nvread 0 336 24'
+nvread 0 336 24
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 
+
+GO>
+
+===== >>> 'nvread 0 360 24'
+nvread 0 360 24
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 
+
+GO>
+
+===== >>> 'nvread 0 384 24'
+nvread 0 384 24
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 
+
+GO>
+
+===== >>> 'nvread 0 408 24'
+nvread 0 408 24
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 
+
+GO>
+
+===== >>> 'nvread 0 432 24'
+nvread 0 432 24
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 
+
+GO>
+
+===== >>> 'nvread 0 456 24'
+nvread 0 456 24
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 
+
+GO>
+
+===== >>> 'nvread 0 480 24'
+nvread 0 480 24
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 
+
+GO>
+
+===== >>> 'nvread 0 504 24'
+nvread 0 504 24
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 
+
+GO>
+
+===== >>> 'nvread 1 0 24'
+nvread 1 0 24
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 
+
+GO>
+
+===== >>> 'nvread 1 24 24'
+nvread 1 24 24
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 
+
+GO>
+
+===== >>> 'nvread 1 48 24'
+nvread 1 48 24
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 
+
+GO>
+
+===== >>> 'nvread 1 72 24'
+nvread 1 72 24
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 
+
+GO>
+
+===== >>> 'nvread 1 96 24'
+nvread 1 96 24
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 
+
+GO>
+
+===== >>> 'nvread 1 120 24'
+nvread 1 120 24
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 
+
+GO>
+
+===== >>> 'nvread 1 144 24'
+nvread 1 144 24
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 
+
+GO>
+
+===== >>> 'nvread 1 168 24'
+nvread 1 168 24
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 
+
+GO>
+
+===== >>> 'nvread 1 192 24'
+nvread 1 192 24
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 
+
+GO>
+
+===== >>> 'nvread 1 216 24'
+nvread 1 216 24
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 
+
+GO>
+
+===== >>> 'nvread 1 240 24'
+nvread 1 240 24
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 
+
+GO>
+
+===== >>> 'nvread 1 264 24'
+nvread 1 264 24
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 
+
+GO>
+
+===== >>> 'nvread 1 288 24'
+nvread 1 288 24
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 
+
+GO>
+
+===== >>> 'nvread 1 312 24'
+nvread 1 312 24
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 
+
+GO>
+
+===== >>> 'nvread 1 336 24'
+nvread 1 336 24
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 
+
+GO>
+
+===== >>> 'nvread 1 360 24'
+nvread 1 360 24
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 
+
+GO>
+
+===== >>> 'nvread 1 384 24'
+nvread 1 384 24
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 
+
+GO>
+
+===== >>> 'nvread 1 408 24'
+nvread 1 408 24
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 
+
+GO>
+
+===== >>> 'nvread 1 432 24'
+nvread 1 432 24
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 
+
+GO>
+
+===== >>> 'nvread 1 456 24'
+nvread 1 456 24
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 
+
+GO>
+
+===== >>> 'nvread 1 480 24'
+nvread 1 480 24
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 
+
+GO>
+
+===== >>> 'nvread 1 504 24'
+nvread 1 504 24
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 0xff 
+0xff 0xff 0xff 0xff 
+
+GO>
+===== >>> 'VER'
+  0.00s b'VER\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'Ver'
+  0.00s b'Ver\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 've'
+  0.00s b've\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'vers'
+  0.00s b'vers\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'ver extra args'
+  0.00s b'ver extra args\r\nVersion: $Id: pragelato.h 704 2013-08-09 03:41:27Z rudrava $\r\n\r\nGO>\r\n'
+===== >>> '  ver'
+  0.00s b'  ver\r\nVersion: $Id: pragelato.h 704 2013-08-09 03:41:27Z rudrava $\r\n\r\nGO>\r\n'
+===== >>> 'ver  '
+  0.00s b'ver  \r\nVersion: $Id: pragelato.h 704 2013-08-09 03:41:27Z rudrava $\r\n\r\nGO>\r\n'
+===== >>> ''
+  0.00s b'\r\nGO>\r\n'
+===== >>> 'elev  '
+  0.00s b'elev  \r\nCurrent elevation: 1455\r\n\r\nGO>\r\n'
+===== >>> 'elev x'
+  0.00s b'elev x\r\ntarget: 0000    current: 1455\r\n\r\nGO>\r\n'
+===== >>> 'aznudge foo'
+  0.00s b'aznudge foo\r\n\r\nGO>\r\n'
+===== >>> 'elev'
+  0.00s b'elev\r\nCurrent elevation: 1000\r\n\r\nGO>\r\n'
+===== >>> 'elev 1455'
+  0.00s b'elev 1455\r\ntarget: 1455    current: 0855\r\n\r\nGO>\r\n'
+===== >>> 'elev'
+  0.00s b'elev\r\nCurrent elevation: 0963\r\n\r\nGO>\r\n'
+===== >>> 'elev'
+  0.00s b'elev\r\nCurrent elevation: 1406\r\n\r\nGO>\r\n'
+===== >>> 'elev'
+  0.00s b'elev\r\nCurrent elevation: 1452\r\n\r\nGO>\r\n'
+===== >>> 'elev'
+  0.00s b'elev\r\nCurrent elevation: 1452\r\n\r\nGO>\r\n'
+===== >>> 'elev'
+  0.00s b'elev\r\nCurrent elevation: 1452\r\n\r\nGO>\r\n'
+===== >>> 'elev'
+  0.00s b'elev\r\nCurrent elevation: 1452\r\n\r\nGO>\r\n'
+===== >>> 'elev'
+  0.00s b'elev\r\nCurrent elevation: 1452\r\n\r\nGO>\r\n'
+===== >>> 'elev'
+  0.00s b'elev\r\nCurrent elevation: 1452\r\n\r\nGO>\r\n'
+===== >>> 'elevwatch 2'
+  0.00s b'elevwatch 2\r\n'
+  1.96s b'Average: 1452.00, SD: 0.00, Max: 1452, Min: 1452\r\n\r\nGO>\r\n'
+===== >>> 'azim'
+  0.00s b'azim\r\nCurrent heading:       4339\r\n\r\nGO>\r\n'
+===== >>> 'azimwatch 2'
+  0.00s b'azimwatch 2\r\n'
+  1.96s b'Average: 4339.10, SD: 2.55, Max: 4343, Min: 4334\r\n\r\nGO>\r\n'
+===== >>> 'aznudge cw'
+  0.00s b'aznudge cw\r\n\r\nGO>\r\n'
+===== >>> 'azimwatch 2'
+  0.00s b'azimwatch 2\r\n'
+  1.96s b'Average: 4334.97, SD: 1.76, Max: 4337, Min: 4331\r\n\r\nGO>\r\n'
+===== >>> 'aznudge cw'
+  0.00s b'aznudge cw\r\n\r\nGO>\r\n'
+===== >>> 'azimwatch 2'
+  0.00s b'azimwatch 2\r\n'
+  1.96s b'Average: 4329.92, SD: 2.99, Max: 4334, Min: 4322\r\n\r\nGO>\r\n'
+===== >>> 'aznudge ccw'
+  0.00s b'aznudge ccw\r\n\r\nGO>\r\n'
+===== >>> 'azimwatch 2'
+  0.00s b'azimwatch 2\r\n'
+  1.96s b'Average: 4329.70, SD: 3.20, Max: 4334, Min: 4323\r\n\r\nGO>\r\n'
+===== >>> 'aznudge ccw'
+  0.00s b'aznudge ccw\r\n\r\nGO>\r\n'
+===== >>> 'azimwatch 2'
+  0.00s b'azimwatch 2\r\n'
+  1.96s b'Average: 4329.92, SD: 1.99, Max: 4332, Min: 4325\r\n\r\nGO>\r\n'
+===== >>> 'elevwatch 1'
+  0.00s b'elevwatch 1\r\n'
+  0.96s b'Average: 1452.00, SD: 0.00, Max: 1452, Min: 1452\r\n\r\nGO>\r\n'
+===== >>> 'elnudge up'
+  0.00s b'elnudge up\r\n\r\nGO>\r\n'
+===== >>> 'elevwatch 1'
+  0.00s b'elevwatch 1\r\n'
+  0.96s b'Average: 1456.00, SD: 0.00, Max: 1456, Min: 1456\r\n\r\nGO>\r\n'
+===== >>> 'elnudge up'
+  0.00s b'elnudge up\r\n\r\nGO>\r\n'
+===== >>> 'elevwatch 1'
+  0.00s b'elevwatch 1\r\n'
+  0.96s b'Average: 1461.00, SD: 0.00, Max: 1461, Min: 1461\r\n\r\nGO>\r\n'
+===== >>> 'elnudge down'
+  0.00s b'elnudge down\r\n\r\nGO>\r\n'
+===== >>> 'elevwatch 1'
+  0.00s b'elevwatch 1\r\n'
+  0.96s b'Average: 1459.85, SD: 0.37, Max: 1460, Min: 1459\r\n\r\nGO>\r\n'
+===== >>> 'elnudge down'
+  0.00s b'elnudge down\r\n\r\nGO>\r\n'
+===== >>> 'elevwatch 1'
+  0.00s b'elevwatch 1\r\n'
+  0.96s b'Average: 1458.00, SD: 0.00, Max: 1458, Min: 1458\r\n\r\nGO>\r\n'
+===== >>> 'elangle 30'
+  0.00s b'elangle 30\r\nDest Angle:   30    Dest Count:        867\r\n\r\nGO>\r\n'
+===== >>> 'elev 1458'
+  0.00s b'elev 1458\r\ntarget: 1458    current: 1449\r\n\r\nGO>\r\n'
+===== >>> 'elevwatch 1'
+  0.00s b'elevwatch 1\r\n'
+  0.96s b'Average: 1458.00, SD: 0.00, Max: 1458, Min: 1458\r\n\r\nGO>\r\n'
+===== >>> 'elangle 5'
+  0.00s b'elangle 5\r\nDest Angle:    5    Dest Count:        497\r\n\r\nGO>\r\n'
+===== >>> 'elev 1458'
+  0.00s b'elev 1458\r\ntarget: 1458    current: 1452\r\n\r\nGO>\r\n'
+  0.05s b'Stopped at El: 1452\r\n'
+===== >>> 'elangle 10'
+  0.00s b'elangle 10\r\nDest Angle:   10    Dest Count:        571\r\n\r\nGO>\r\n'
+===== >>> 'elev 1458'
+  0.00s b'elev 1458\r\ntarget: 1458    current: 1440\r\n\r\nGO>\r\n'
+===== >>> 'elangle 20'
+  0.00s b'elangle 20\r\nDest Angle:   20    Dest Count:        719\r\n\r\nGO>\r\n'
+===== >>> 'elev 1458'
+  0.00s b'elev 1458\r\ntarget: 1458    current: 1439\r\n\r\nGO>\r\n'
+===== >>> 'elangle 40'
+  0.00s b'elangle 40\r\nDest Angle:   40    Dest Count:       1014\r\n\r\nGO>\r\n'
+===== >>> 'elev 1458'
+  0.00s b'elev 1458\r\ntarget: 1458    current: 1442\r\n\r\nGO>\r\n'
+===== >>> 'elangle 50'
+  0.00s b'elangle 50\r\nDest Angle:   50    Dest Count:       1162\r\n\r\nGO>\r\n'
+===== >>> 'elev 1458'
+  0.00s b'elev 1458\r\ntarget: 1458    current: 1443\r\n\r\nGO>\r\n'
+===== >>> 'elangle 60'
+  0.00s b'elangle 60\r\nDest Angle:   60    Dest Count:       1310\r\n\r\nGO>\r\n'
+===== >>> 'elev 1458'
+  0.00s b'elev 1458\r\ntarget: 1458    current: 1441\r\n\r\nGO>\r\n'
+===== >>> 'elangle 70'
+  0.00s b'elangle 70\r\nDest Angle:   70    Dest Count:       1458\r\n\r\nGO>\r\n'
+===== >>> 'elev 1458'
+  0.00s b'elev 1458\r\ntarget: 1458    current: 1446\r\n\r\nGO>\r\n'
+===== >>> 'elangle 0'
+  0.00s b'elangleStopped at El: 1454\r\n 0\r\nDest Angle:    0    Dest Count:        423\r\n\r\nGO>\r\n'
+===== >>> 'elev 1458'
+  0.00s b'elev 1458\r\ntarget: 1458    current: 1456\r\n\r\nGO>\r\n'
+===== >>> 'elangle 80'
+  0.00s b'elangle 80\r\nDest Angle:   80    Dest Count:       1605\r\n\r\nGO>\r\n'
+===== >>> 'elev 1458'
+  0.00s b'elev 1458\r\ntarget: 1458    current: 1456\r\n\r\nGO>\r\nStopped at El: 1458\r\n'
+  5.04s TIMEOUT
+===== >>> 'elangle 90'
+  0.00s b'elangle 90\r\nDest Angle:   90    Dest Count:       1753\r\n\r\nGO>\r\n'
+===== >>> 'elev 1458'
+  0.00s b'elev 1458\r\ntarget: 1458    current: 1470\r\n\r\nGO>\r\n'
+===== >>> 'elangle -5'
+  0.00s b'elangle -5\r\nDest Angle: 65531    Dest Count:      51358\r\n\r\nGO>\r\n'
+===== >>> 'elev 1458'
+  0.00s b'elev 1458\r\ntarget: 1458    current: 1473\r\n\r\nGO>\r\n'
+===== >>> 'elevwatch 1'
+  0.00s b'elevwatch 1\r\n'
+  0.96s b'Average: 1460.00, SD: 0.00, Max: 1460, Min: 1460\r\n\r\nGO>\r\n'
+===== >>> 'azangle 0'
+  0.00s b'azangle 0\r\nDest Angle:    0    Dest Count:        725\r\n\r\nGO>\r\n'
+===== >>> 'azim 4330'
+  0.00s b'azim 4330\r\ntarget:       4330    current:       4248\r\n\r\nGO>\r\n'
+===== >>> 'azangle 10'
+  0.00s b'azangle 10\r\nDest Angle:   10    Dest Count:        881\r\n\r\nGO>\r\n'
+===== >>> 'azim 4330'
+  0.00s b'azim 4330\r\ntarget:       4330    current:       4221\r\n\r\nGO>\r\n'
+===== >>> 'azangle 45'
+  0.00s b'azangle 45\r\nDest Angle:   45    Dest Count:       1427\r\n\r\nGO>\r\n'
+===== >>> 'azim 4330'
+  0.00s b'azim 4330\r\ntarget:       4330    current:       4219\r\n\r\nGO>\r\n'
+===== >>> 'azangle 90'
+  0.00s b'azangle 90\r\nDest Angle:   90    Dest Count:       2129\r\n\r\nGO>\r\n'
+===== >>> 'azim 4330'
+  0.00s b'azim 4330\r\ntarget:       4330    current:       4209\r\n\r\nGO>\r\n'
+===== >>> 'azangle 180'
+  0.00s b'azangle 180\r\nDest Angle:  180    Dest Count:       3533\r\n\r\nGO>\r\n'
+===== >>> 'azim 4330'
+  0.00s b'azim 4330\r\ntarget:       4330    current:       4204\r\n\r\nGO>\r\n'
+===== >>> 'azangle 270'
+  0.00s b'azangle 270\r\nDest Angle:  270    Dest Count:       5166\r\n\r\nGO>\r\n'
+===== >>> 'azim 4330'
+  0.00s b'azim 4330\r\ntarget:       4330    current:       4412\r\n\r\nGO>\r\n'
+===== >>> 'azangle 359'
+  0.00s b'azangle 359\r\nDest Angle:  359    Dest Count:       6608\r\n\r\nGO>\r\n'
+===== >>> 'azim 4330'
+  0.00s b'azim 4330\r\ntarget:       4330    current:       4431\r\n\r\nGO>\r\n'
+===== >>> 'azangle 360'
+  0.00s b'azangle 360\r\nDest Angle:  360    Dest Count:       6624\r\n\r\nGO>\r\n'
+===== >>> 'azim 4330'
+  0.00s b'azim 4330\r\ntarget:       4330    current:       4438\r\n\r\nGO>\r\n'
+===== >>> 'azangle 400'
+  0.00s b'azangle 400\r\nDest Angle:  400    Dest Count:       7272\r\n\r\nGO>\r\n'
+===== >>> 'azim 4330'
+  0.00s b'azim 4330\r\ntarget:       4330    current:       4440\r\n\r\nGO>\r\n'
+===== >>> 'azimwatch 2'
+  0.00s b'azimwatch 2\r\n'
+  1.96s b'Average: 4329.90, SD: 2.37, Max: 4332, Min: 4324\r\n\r\nGO>\r\n'
+===== >>> 'azangle 1'
+  0.00s b'azangle 1\r\nDest Angle:    1    Dest Count:        741\r\n\r\nGO>\r\n'
+===== >>> 'azim 4330'
+  0.00s b'azim 4330\r\ntarget:       4330    current:       4221\r\n\r\nGO>\r\n'
+===== >>> 'azangle 2'
+  0.00s b'azangle 2\r\nDest Angle:    2    Dest Count:        756\r\n\r\nGO>\r\n'
+===== >>> 'azim 4330'
+  0.00s b'azim 4330\r\ntarget:       4330    current:       4211\r\n\r\nGO>\r\n'
+===== >>> 'azangle 3'
+  0.00s b'azangle 3\r\nDest Angle:    3    Dest Count:        772\r\n\r\nGO>\r\n'
+===== >>> 'azim 4330'
+  0.00s b'azim 4330\r\ntarget:       4330    current:       4202\r\n\r\nGO>\r\n'
+===== >>> 'azangle 135'
+  0.00s b'azangle 135\r\nDest Angle:  135    Dest Count:       2831\r\n\r\nGO>\r\n'
+===== >>> 'azim 4330'
+  0.00s b'azim 4330\r\ntarget:       4330    current:       4196\r\n\r\nGO>\r\n'
+===== >>> 'azangle 179'
+  0.00s b'azangle 179\r\nDest Angle:  179    Dest Count:       3517\r\n\r\nGO>\r\n'
+===== >>> 'azim 4330'
+  0.00s b'azim 4330\r\ntarget:       4330    current:       4202\r\n\r\nGO>\r\n'
+===== >>> 'azangle 181'
+  0.00s b'azangle 181\r\nDest Angle:  181    Dest Count:       3549\r\n\r\nGO>\r\n'
+===== >>> 'azim 4330'
+  0.00s b'azim 4330\r\ntarget:       4330    current:       4196\r\n\r\nGO>\r\n'
+===== >>> 'azangle 200'
+  0.00s b'azangle 200\r\nDest Angle:  200    Dest Count:       3845\r\n\r\nGO>\r\n'
+===== >>> 'azim 4330'
+  0.00s b'azim 4330\r\ntarget:       4330    current:       4198\r\n\r\nGO>\r\n'
+===== >>> 'azangle 225'
+  0.00s b'azangle 225\r\nDest Angle:  225    Dest Count:       4437\r\n\r\nGO>\r\n'
+===== >>> 'azim 4330'
+  0.00s b'azim 4330\r\ntarget:       4330    current:       4401\r\n\r\nGO>\r\n'
+===== >>> 'azangle 240'
+  0.00s b'azangle 240\r\nDest Angle:  240    Dest Count:       4680\r\n\r\nGO>\r\n'
+===== >>> 'azim 4330'
+  0.00s b'azim 4330\r\ntarget:       4330    current:       4420\r\n\r\nGO>\r\n'
+===== >>> 'azangle 269'
+  0.00s b'azangle 269\r\nDest Angle:  269    Dest Count:       5150\r\n\r\nGO>\r\n'
+===== >>> 'azim 4330'
+  0.00s b'azim 4330\r\ntarget:       4330    current:       4428\r\n\r\nGO>\r\n'
+===== >>> 'azangle 271'
+  0.00s b'azangle 271\r\nDest Angle:  271    Dest Count:       5182\r\n\r\nGO>\r\n'
+===== >>> 'azim 4330'
+  0.00s b'azim 4330\r\ntarget:       4330    current:       4440\r\n\r\nGO>\r\n'
+===== >>> 'azangle 300'
+  0.00s b'azangle 300\r\nDest Angle:  300    Dest Count:       5652\r\n\r\nGO>\r\n'
+===== >>> 'azim 4330'
+  0.00s b'azim 4330\r\ntarget:       4330    current:       4441\r\n\r\nGO>\r\n'
+===== >>> 'azangle 330'
+  0.00s b'azangle 330\r\nDest Angle:  330    Dest Count:       6138\r\n\r\nGO>\r\n'
+===== >>> 'azim 4330'
+  0.00s b'azim 4330\r\ntarget:       4330    current:       4439\r\n\r\nGO>\r\n'
+===== >>> 'azangle 450'
+  0.00s b'azangle 450\r\nDest Angle:  450    Dest Count:       8082\r\n\r\nGO>\r\n'
+===== >>> 'azim 4330'
+  0.00s b'azim 4330\r\ntarget:       4330    current:       4442\r\n\r\nGO>\r\n'
+===== >>> 'azangle 500'
+  0.00s b'azangle 500\r\nDest Angle:  500    Dest Count:       8892\r\n\r\nGO>\r\n'
+===== >>> 'azim 4330'
+  0.00s b'azim 4330\r\ntarget:       4330    current:       4443\r\n\r\nGO>\r\n'
+===== >>> 'azangle 1000'
+  0.00s b'azangle 1000\r\nDest Angle: 1000    Dest Count:      16992\r\n\r\nGO>\r\n'
+===== >>> 'azim 4330'
+  0.00s b'azim 4330\r\ntarget:       4330    current:       4435\r\n\r\nGO>\r\n'
+===== >>> 'azimwatch 2'
+  0.00s b'azimwatch 2\r\n'
+  1.96s b'Average: 4328.88, SD: 2.04, Max: 4332, Min: 4324\r\n\r\nGO>\r\n'
+===== >>> 'azangle 201'
+  0.00s b'azangle 201\r\nDest Angle:  201    Dest Count:       3823\r\n\r\nGO>\r\n'
+===== >>> 'azim 4330'
+  0.00s b'azim 4330\r\ntarget:       4330    current:       4217\r\n\r\nGO>\r\n'
+===== >>> 'azangle 202'
+  0.00s b'azangle 202\r\nDest Angle:  202    Dest Count:       3850\r\n\r\nGO>\r\n'
+===== >>> 'azim 4330'
+  0.00s b'azim 4330\r\ntarget:       4330    current:       4210\r\n\r\nGO>\r\n'
+===== >>> 'azangle 203'
+  0.00s b'azangle 203\r\nDest Angle:  203    Dest Count:       3878\r\n\r\nGO>\r\n'
+===== >>> 'azim 4330'
+  0.00s b'azim 4330\r\ntarget:       4330    current:       4208\r\n\r\nGO>\r\n'
+===== >>> 'azangle 204'
+  0.00s b'azangle 204\r\nDest Angle:  204    Dest Count:       3905\r\n\r\nGO>\r\n'
+===== >>> 'azim 4330'
+  0.00s b'azim 4330\r\ntarget:       4330    current:       4201\r\n\r\nGO>\r\n'
+===== >>> 'azangle 205'
+  0.00s b'azangle 205\r\nDest Angle:  205    Dest Count:       3933\r\n\r\nGO>\r\n'
+===== >>> 'azim 4330'
+  0.00s b'azim 4330\r\ntarget:       4330    current:       4208\r\n\r\nGO>\r\n'
+===== >>> 'azangle 206'
+  0.00s b'azangle 206\r\nDest Angle:  206    Dest Count:       3961\r\n\r\nGO>\r\n'
+===== >>> 'azim 4330'
+  0.00s b'azim 4330\r\ntarget:       4330    current:       4203\r\n\r\nGO>\r\n'
+===== >>> 'azangle 207'
+  0.00s b'azangle 207\r\nDest Angle:  207    Dest Count:       3988\r\n\r\nGO>\r\n'
+===== >>> 'azim 4330'
+  0.00s b'azim 4330\r\ntarget:       4330    current:       4199\r\n\r\nGO>\r\n'
+===== >>> 'azangle 208'
+  0.00s b'azangle 208\r\nDest Angle:  208    Dest Count:       4016\r\n\r\nGO>\r\n'
+===== >>> 'azim 4330'
+  0.00s b'azim 4330\r\ntarget:       4330    current:       4193\r\n\r\nGO>\r\n'
+===== >>> 'azangle 209'
+  0.00s b'azangle 209\r\nDest Angle:  209    Dest Count:       4043\r\n\r\nGO>\r\n'
+===== >>> 'azim 4330'
+  0.00s b'azim 4330\r\ntarget:       4330    current:       4208\r\n\r\nGO>\r\n'
+===== >>> 'azangle 210'
+  0.00s b'azangle 210\r\nDest Angle:  210    Dest Count:       4071\r\n\r\nGO>\r\n'
+===== >>> 'azim 4330'
+  0.00s b'azim 4330\r\ntarget:       4330    current:       4208\r\n\r\nGO>\r\n'
+===== >>> 'azangle 211'
+  0.00s b'azangle 211\r\nDest Angle:  211    Dest Count:       4099\r\n\r\nGO>\r\n'
+===== >>> 'azim 4330'
+  0.00s b'azim 4330\r\ntarget:       4330    current:       4204\r\n\r\nGO>\r\n'
+===== >>> 'azangle 212'
+  0.00s b'azangle 212\r\nDest Angle:  212    Dest Count:       4226\r\n\r\nGO>\r\n'
+===== >>> 'azim 4330'
+  0.00s b'azim 4330\r\ntarget:       4330    current:       4246\r\n\r\nGO>\r\n'
+===== >>> 'azangle 213'
+  0.00s b'azangle 213\r\nDest Angle:  213    Dest Count:       4243\r\n\r\nGO>\r\n'
+===== >>> 'azim 4330'
+  0.00s b'azim 4330\r\ntarget:       4330    current:       4263\r\n\r\nGO>\r\n'
+===== >>> 'azangle 214'
+  0.00s b'azangle 214\r\nDest Angle:  214    Dest Count:       4259\r\n\r\nGO>\r\n'
+===== >>> 'azim 4330'
+  0.00s b'azim 4330\r\ntarget:       4330    current:       4291\r\n\r\nGO>\r\n'
+===== >>> 'azangle 215'
+  0.00s b'azangle 215\r\nDest Angle:  215    Dest Count:       4275\r\n\r\nGO>\r\n'
+===== >>> 'azim 4330'
+  0.00s b'azim 4330\r\ntarget:       4330    current:       4300\r\n\r\nGO>\r\n'
+===== >>> 'azangle 216'
+  0.00s b'azangle 216\r\nDest Angle:  216    Dest Count:       4291\r\n\r\nGO>\r\n'
+===== >>> 'azim 4330'
+  0.00s b'azim 4330\r\ntarget:       4330    current:       4295\r\n\r\nGO>\r\n'
+===== >>> 'azangle 217'
+  0.00s b'azangle 217\r\nDest Angle:  217    Dest Count:       4307\r\n\r\nGO>\r\n'
+===== >>> 'azim 4330'
+  0.00s b'azim 4Stopped at Az: 4312\r\n330\r\ntarget:       4330    current:       4312\r\n\r\nGO>\r\n'
+===== >>> 'azangle 218'
+  0.00s b'azanStopped at Az: 4334\r\ngle 218\r\nDest Angle:  218    Dest Count:       4324\r\n\r\nGO>\r\n'
+===== >>> 'azim 4330'
+  0.00s b'azim 4330\r\ntarget:       4330    current:       4335\r\n\r\nGO>\r\n'
+  0.10s b'Stopped at Az: 4328\r\n'
+===== >>> 'azangle 219'
+  0.00s b'azangle 219\r\nDest Angle:  219    Dest Count:       4340\r\n\r\nGO>\r\n'
+  0.10s b'Stopped at Az: 4335\r\n'
+===== >>> 'azim 4330'
+  0.00s b'azim 4330\r\ntarget:       4330    current:       4336\r\n\r\nGO>\r\n'
+  0.10s b'Stopped at Az: 4330\r\n'
+===== >>> 'azangle 220'
+  0.00s b'azangle 220\r\nDest Angle:  220    Dest Count:       4356\r\n\r\nGO>\r\n'
+===== >>> 'azim 4330'
+  0.00s b'azim 4Stopped at Az: 4359\r\n330\r\ntarget:       4330    current:       4360\r\n\r\nGO>\r\n'
+===== >>> 'azangle 221'
+  0.00s b'azangle 2Stopped at Az: 4331\r\n21\r\nDest Angle:  221    Dest Count:       4372\r\n\r\nGO>\r\n'
+===== >>> 'azim 4330'
+  0.00s b'azim 4330\r\ntarget:       4330    current:       4363\r\n\r\nGO>\r\n'
+===== >>> 'azangle 222'
+  0.00s b'azangle 222\r\nDest Angle:  222    Dest Count:       4388\r\n\r\nGO>\r\n'
+===== >>> 'azim 4330'
+  0.00s b'azim 4330\r\ntarget:       4330    current:       4362\r\n\r\nGO>\r\n'
+===== >>> 'azangle 223'
+  0.00s b'azangle 223\r\nDest Angle:  223    Dest Count:       4405\r\n\r\nGO>\r\n'
+===== >>> 'azim 4330'
+  0.00s b'azim 4330\r\ntarget:       4330    current:       4381\r\n\r\nGO>\r\n'
+===== >>> 'azangle 224'
+  0.00s b'azangle 224\r\nDest Angle:  224    Dest Count:       4421\r\n\r\nGO>\r\n'
+===== >>> 'azim 4330'
+  0.00s b'azim 4330\r\ntarget:       4330    current:       4403\r\n\r\nGO>\r\n'
+===== >>> 'azimwatch 2'
+  0.00s b'azimwatch 2\r\n'
+  1.96s b'Average: 4329.78, SD: 2.13, Max: 4333, Min: 4326\r\n\r\nGO>\r\n'
+===== >>> 'nvwrite'
+  0.00s b'nvwrite\r\nSpecify <structID>, <offset>, and <data bytes>\r\n\r\nGO>\r\n'
+===== >>> 'nvread 0 0 24'
+  0.00s b'nvread 0 0 24\r\n0x00 0x00 0xcc 0x41 0x33 0x33 0x37 0x42 0x98 0x09 \r\n0x9a 0x03 0x00 0x00 0xf1 0x08 0x57 0x03 0x00 0x00 \r\n0x48 0x08 0xfa 0x02 \r\n\r\nGO>\r\n'
+===== >>> 'nvread 0 24 12'
+  0.00s b'nvread 0 24 12\r\n0x00 0x00 0xd8 0x0e 0xe8 0x03 0x01 0x00 0xff 0xff \r\n0x00 0x00 \r\n\r\nGO>\r\n'
+===== >>> 'stat'
+  0.00s b'stat\r\nSpecify <element count> and <window>\r\n\r\nGO>\r\n'
+===== >>> 'stat 10 3'
+  0.00s b'stat 10 3\r\n\r\nGO>\r\n'
+===== >>> 'stat 20 5'
+  0.00s b'stat 20 5\r\n\r\nGO>\r\n'
+===== >>> 'elacc 70' (guarded)
+'elacc 70\r\ntarget: 0070    current: 1458\r\n\r\nGO>\r\n\n[GUARD] target not near home -> cancelled with retarget 1460elev 1460\r\ntarget: 1460    current: 1460\r\n\r\nGO>\r\nStopped at El: 1451\r\n'
+===== >>> 'elevwatch 1'
+  0.00s b'elevwatch 1\r\n'
+  0.96s b'Average: 1450.00, SD: 0.00, Max: 1450, Min: 1450\r\n\r\nGO>\r\n'
+===== >>> 'elacc 1460' (guarded)
+'elacc 1460\r\ntarget: 1460    current: 1450\r\n\r\nGO>\r\nStopped at El: 1462\r\n'
+===== >>> 'elevwatch 1'
+  0.00s b'elevwatch 1\r\n'
+  0.96s b'Average: 1462.00, SD: 0.00, Max: 1462, Min: 1462\r\n\r\nGO>\r\n'
+===== >>> 'azacc 4330' (guarded)
+'azacc 4330\r\ntarget:       4330    current:       4329\r\n\r\nGO>\r\nStopped at Az: 4330\r\n'
+===== >>> 'azimwatch 2'
+  0.00s b'azimwatch 2\r\n'
+  1.96s b'Average: 4329.70, SD: 3.00, Max: 4333, Min: 4323\r\n\r\nGO>\r\n'
+===== >>> 'elevmt 1460' (guarded)
+'elevmt 1460\r\ntarget: 1460    current: 1462\r\n\r\nGO>\r\n'
+===== >>> 'elev'
+  0.00s b'elev\r\nCurrent elevation: 1462\r\n\r\nGO>\r\n'
+===== >>> 'elevwatch 3'
+  0.00s b'elevwatch 3\r\n'
+  2.97s b'Average: 1462.00, SD: 0.00, Max: 1462, Min: 1462\r\n\r\nGO>\r\n'
+===== >>> elevmt maintain test
+elnudge down
+
+GO>
+elnudge down
+
+GO>
+elnudge down
+
+GO>
+elnudge down
+
+GO>
+elev
+Current elevation: 1443
+
+GO>
+elev
+Current elevation: 1443
+
+GO>
+elev
+Current elevation: 1443
+
+GO>
+elev
+Current elevation: 1443
+
+GO>
+elev
+Current elevation: 1443
+
+GO>
+elev
+Current elevation: 1443
+
+GO>
+elev
+Current elevation: 1443
+
+GO>
+elev
+Current elevation: 1443
+
+GO>
+elev
+Current elevation: 1443
+
+GO>
+elev
+Current elevation: 1443
+
+GO>
+elev
+Current elevation: 1443
+
+GO>
+elev
+Current elevation: 1443
+
+GO>
+
+===== >>> 'elacc 1460' (guarded)
+'elacc 1460\r\ntarget: 1460    current: 1443\r\n\r\nGO>\r\nStopped at El: 1462\r\n'
+===== >>> scan test
+ 0.05s b'scan\r\nPlease specify an action (dump or reset)\r\n\r\nGO>\r\n'
+20.13s [after stop] b'scan\r\nPlease specify an action (dump or reset)\r\n\r\nGO>\r\n'
+===== >>> 'scan dump'
+  0.00s b'scan dump\r\n\r\nGO>\r\n'
+===== >>> scan start test
+ 0.16s b'scan start\r\n\r\nGO>\r\n'
+15.30s [stop] b'scan stop\r\n\r\nGO>\r\n'
+17.36s [pos] b'azim\r\nCurrent heading:       4325\r\n\r\nGO>\r\n'
+18.46s [dump] b'scan dump\r\n\r\nGO>\r\n'
+===== >>> 'elacc 1455' (guarded)
+'elacc 1455\r\ntarget: 1455    current: 1462\r\n\r\nGO>\r\nStopped at El: 1455\r\n'
+===== >>> 'azacc 4341' (guarded)
+'azacc 4341\r\ntarget:       4341    current:       4331\r\n\r\nGO>\r\nStopped at Az: 4336\r\n'
+===== >>> 'elevwatch 1'
+  0.00s b'elevwatch 1\r\n'
+  0.96s b'Average: 1455.00, SD: 0.00, Max: 1455, Min: 1455\r\n\r\nGO>\r\n'
+===== >>> 'azimwatch 2'
+  0.00s b'azimwatch 2\r\n'
+  1.96s b'Average: 4334.95, SD: 2.14, Max: 4337, Min: 4330\r\n\r\nGO>\r\n'
+===== >>> 'nvread 0 0 24'
+  0.00s b'nvread 0 0 24\r\n0x00 0x00 0xcc 0x41 0x33 0x33 0x37 0x42 0x98 0x09 \r\n0x9a 0x03 0x00 0x00 0xf1 0x08 0x57 0x03 0x00 0x00 \r\n0x48 0x08 0xfa 0x02 \r\n\r\nGO>\r\n'
+===== >>> 'nvread 0 24 12'
+  0.00s b'nvread 0 24 12\r\n0x00 0x00 0xd8 0x0e 0xe8 0x03 0x01 0x00 0xff 0xff \r\n0x00 0x00 \r\n\r\nGO>\r\n'
+===== >>> 'debug'
+  0.00s b'debug\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'dbg'
+  0.00s b'dbg\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'dump'
+  0.00s b'dump\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'peek'
+  0.00s b'peek\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'mem'
+  0.00s b'mem\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'memory'
+  0.00s b'memory\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'info'
+  0.00s b'info\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'status'
+  0.00s b'status\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'stats'
+  0.00s b'stats\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'sys'
+  0.00s b'sys\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'system'
+  0.00s b'system\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'id'
+  0.00s b'id\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'test'
+  0.00s b'test\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'tests'
+  0.00s b'tests\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'diag'
+  0.00s b'diag\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'log'
+  0.00s b'log\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'logs'
+  0.00s b'logs\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'version'
+  0.00s b'version\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'about'
+  0.00s b'about\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'config'
+  0.00s b'config\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'cfg'
+  0.00s b'cfg\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'get'
+  0.00s b'get\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'show'
+  0.00s b'show\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'list'
+  0.00s b'list\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'menu'
+  0.00s b'menu\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'rf'
+  0.00s b'rf\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'rfss'
+  0.00s b'rfss\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'sig'
+  0.00s b'sig\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'signal'
+  0.00s b'signal\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'snr'
+  0.00s b'snr\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'agc'
+  0.00s b'agc\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'lnb'
+  0.00s b'lnb\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'tuner'
+  0.00s b'tuner\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'sat'
+  0.00s b'sat\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'sats'
+  0.00s b'sats\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'band'
+  0.00s b'band\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'tone'
+  0.00s b'tone\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'pol'
+  0.00s b'pol\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'skew'
+  0.00s b'skew\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'motor'
+  0.00s b'motor\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'mot'
+  0.00s b'mot\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'motors'
+  0.00s b'motors\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'pwm'
+  0.00s b'pwm\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'speed'
+  0.00s b'speed\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'temp'
+  0.00s b'temp\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'volt'
+  0.00s b'volt\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'volts'
+  0.00s b'volts\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'voltage'
+  0.00s b'voltage\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'adc'
+  0.00s b'adc\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'i2c'
+  0.00s b'i2c\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'spi'
+  0.00s b'spi\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'uart'
+  0.00s b'uart\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'echo'
+  0.00s b'echo\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'uptime'
+  0.00s b'uptime\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'time'
+  0.00s b'time\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'clock'
+  0.00s b'clock\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'date'
+  0.00s b'date\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'serial'
+  0.00s b'serial\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'sn'
+  0.00s b'sn\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'hw'
+  0.00s b'hw\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'fw'
+  0.00s b'fw\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'build'
+  0.00s b'build\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'az'
+  0.00s b'az\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'el'
+  0.00s b'el\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'azwatch'
+  0.00s b'azwatch\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'elwatch'
+  0.00s b'elwatch\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'rfscan'
+  0.00s b'rfscan\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'watch'
+  0.00s b'watch\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'tilt'
+  0.00s b'tilt\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'sensor'
+  0.00s b'sensor\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'sensors'
+  0.00s b'sensors\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'accel'
+  0.00s b'accel\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'compass'
+  0.00s b'compass\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'mag'
+  0.00s b'mag\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'gyro'
+  0.00s b'gyro\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'heading'
+  0.00s b'heading\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'pos'
+  0.00s b'pos\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'position'
+  0.00s b'position\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'where'
+  0.00s b'where\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'limits'
+  0.00s b'limits\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'limit'
+  0.00s b'limit\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'stop'
+  0.00s b'stop\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'halt'
+  0.00s b'halt\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'abort'
+  0.00s b'abort\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'quit'
+  0.00s b'quit\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'exit'
+  0.00s b'exit\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'sleep'
+  0.00s b'sleep\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'wake'
+  0.00s b'wake\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'verbose'
+  0.00s b'verbose\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'quiet'
+  0.00s b'quiet\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'hello'
+  0.00s b'hello\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'ping'
+  0.00s b'ping\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'who'
+  0.00s b'who\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'whoami'
+  0.00s b'whoami\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'man'
+  0.00s b'man\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'usage'
+  0.00s b'usage\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'commands'
+  0.00s b'commands\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'cmds'
+  0.00s b'cmds\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'h'
+  0.00s b'h\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'ls'
+  0.00s b'ls\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'dir'
+  0.00s b'dir\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'read'
+  0.00s b'read\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'write'
+  0.00s b'write\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'rd'
+  0.00s b'rd\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'wr'
+  0.00s b'wr\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'param'
+  0.00s b'param\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'params'
+  0.00s b'params\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'setting'
+  0.00s b'setting\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'settings'
+  0.00s b'settings\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'nv'
+  0.00s b'nv\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'nvram'
+  0.00s b'nvram\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'eeprom'
+  0.00s b'eeprom\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'ee'
+  0.00s b'ee\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'lock'
+  0.00s b'lock\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'unlock'
+  0.00s b'unlock\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'pass'
+  0.00s b'pass\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'password'
+  0.00s b'password\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'login'
+  0.00s b'login\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'su'
+  0.00s b'su\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'admin'
+  0.00s b'admin\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'service'
+  0.00s b'service\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'factorytest'
+  0.00s b'factorytest\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'prod'
+  0.00s b'prod\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'mfg'
+  0.00s b'mfg\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'winegard'
+  0.00s b'winegard\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'dish'
+  0.00s b'dish\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'pragelato'
+  0.00s b'pragelato\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'rudrava'
+  0.00s b'rudrava\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'gpswatch'
+  0.00s b'gpswatch\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'azscan'
+  0.00s b'azscan\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'elscan'
+  0.00s b'elscan\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'count'
+  0.00s b'count\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'counts'
+  0.00s b'counts\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'raw'
+  0.00s b'raw\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'azraw'
+  0.00s b'azraw\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'elraw'
+  0.00s b'elraw\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'elcount'
+  0.00s b'elcount\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'azcount'
+  0.00s b'azcount\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'a'
+  0.00s b'a\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'b'
+  0.00s b'b\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'c'
+  0.00s b'c\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'd'
+  0.00s b'd\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'e'
+  0.00s b'e\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'f'
+  0.00s b'f\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'g'
+  0.00s b'g\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'i'
+  0.00s b'i\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'j'
+  0.00s b'j\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'k'
+  0.00s b'k\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'l'
+  0.00s b'l\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'm'
+  0.00s b'm\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'n'
+  0.00s b'n\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'o'
+  0.00s b'o\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'p'
+  0.00s b'p\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'q'
+  0.00s b'q\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'r'
+  0.00s b'r\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 's'
+  0.00s b's\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 't'
+  0.00s b't\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'u'
+  0.00s b'u\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'v'
+  0.00s b'v\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'w'
+  0.00s b'w\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'x'
+  0.00s b'x\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'y'
+  0.00s b'y\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'z'
+  0.00s b'z\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> '!'
+  0.00s b'!\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> '.'
+  0.00s b'.\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> '#'
+  0.00s b'#\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> '@'
+  0.00s b'@\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'build_deb.sh'
+  0.00s b'build_deb.sh\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'build_standalone.sh'
+  0.00s b'build_standalone.sh\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'calibration-20261016-164740.json'
+  0.00s b'calibration-20261016-164740.json\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'dish_app.py'
+  0.00s b'dish_app.py\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'dish_calibrate.py'
+  0.00s b'dish_calibrate.py\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'dish_image.py'
+  0.00s b'dish_image.py\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'dish_motion.py'
+  0.00s b'dish_motion.py\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'dish_scan.py'
+  0.00s b'dish_scan.py\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'dish_time.py'
+  0.00s b'dish_time.py\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'dish_track.py'
+  0.00s b'dish_track.py\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'dish_web.py'
+  0.00s b'dish_web.py\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'docs'
+  0.00s b'docs\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'examples'
+  0.00s b'examples\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'extratailgaterrestrial_1.0.0_all.deb'
+  0.00s b'extratailgaterrestrial_1.0.0_all.deb\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'images'
+  0.00s b'images\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'install.sh'
+  0.00s b'install.sh\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'LICENSE'
+  0.00s b'LICENSE\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'observer_location.json'
+  0.00s b'observer_location.json\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'packaging'
+  0.00s b'packaging\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> '__pycache__'
+  0.00s b'__pycache__\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'README.md'
+  0.00s b'README.md\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'requirements.txt'
+  0.00s b'requirements.txt\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'space_track_credentials.json'
+  0.00s b'space_track_credentials.json\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'static'
+  0.00s b'static\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'templates'
+  0.00s b'templates\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'tle_cache.json'
+  0.00s b'tle_cache.json\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'track_settings.json'
+  0.00s b'track_settings.json\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'azimmt'
+  0.00s b'azimmt\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'azmt'
+  0.00s b'azmt\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'azacc2'
+  0.00s b'azacc2\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'elacc2'
+  0.00s b'elacc2\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'rfmt'
+  0.00s b'rfmt\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'rfacc'
+  0.00s b'rfacc\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'rfnudge'
+  0.00s b'rfnudge\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'scanwatch'
+  0.00s b'scanwatch\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'calwatch'
+  0.00s b'calwatch\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'gpswatch'
+  0.00s b'gpswatch\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'gpsread'
+  0.00s b'gpsread\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'gpsget'
+  0.00s b'gpsget\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'statwatch'
+  0.00s b'statwatch\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'nvdump'
+  0.00s b'nvdump\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'nvlist'
+  0.00s b'nvlist\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'nvinfo'
+  0.00s b'nvinfo\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'nvsize'
+  0.00s b'nvsize\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'stat2'
+  0.00s b'stat2\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'ver2'
+  0.00s b'ver2\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'version2'
+  0.00s b'version2\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'elevacc'
+  0.00s b'elevacc\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'azimacc'
+  0.00s b'azimacc\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'aznudgewatch'
+  0.00s b'aznudgewatch\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'elangleacc'
+  0.00s b'elangleacc\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'azangleacc'
+  0.00s b'azangleacc\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'rfwatch2'
+  0.00s b'rfwatch2\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'tiltwatch'
+  0.00s b'tiltwatch\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'tilt'
+  0.00s b'tilt\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'cal2'
+  0.00s b'cal2\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'calread'
+  0.00s b'calread\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'calshow'
+  0.00s b'calshow\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'scanstat'
+  0.00s b'scanstat\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'scanres'
+  0.00s b'scanres\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
+===== >>> 'scanresult'
+  0.00s b'scanresult\r\nUnknown command, sorry...\r\n\r\nGO>\r\n'
