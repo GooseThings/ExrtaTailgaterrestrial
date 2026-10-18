@@ -427,6 +427,32 @@ def api_move():
     return jsonify({"ok": True, "target_deg": achieved})
 
 
+@app.route("/api/signal")
+def api_signal():
+    """One-shot signal strength reading at the current heading. Skipped (not
+    queued) while another operation owns the dish, so polling it never
+    interferes with a move, scan or track."""
+    with state_lock:
+        dish = state["dish"]
+        if not dish or not dish.is_open:
+            return jsonify({"ok": False, "error": "Not connected."}), 400
+    if not dish_io_lock.acquire(blocking=False):
+        return jsonify({"ok": True, "busy": True, "signal": None})
+    try:
+        stop = threading.Event()
+        timer = threading.Timer(3.0, stop.set)  # don't spin forever on a dead port
+        timer.start()
+        try:
+            signal = read_signal_strength(dish, stop)
+        except Exception:
+            signal = None
+        finally:
+            timer.cancel()
+    finally:
+        dish_io_lock.release()
+    return jsonify({"ok": True, "busy": False, "signal": signal})
+
+
 @app.route("/api/connect", methods=["POST"])
 def api_connect():
     port = (request.json or {}).get("port", state["port"])

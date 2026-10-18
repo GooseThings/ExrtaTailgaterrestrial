@@ -20,6 +20,68 @@ document.querySelectorAll(".tab-btn").forEach((btn) => {
   });
 });
 
+// ── Manual ───────────────────────────────────────────────────────
+
+let signalPeak = 0;
+let signalPolling = false;
+let manualMoving = false;
+
+$("manual-go-btn").addEventListener("click", async () => {
+  const az = parseFloat($("manual-az").value);
+  const el = parseFloat($("manual-el").value);
+  const status = $("manual-status");
+  if (isNaN(az) || isNaN(el) || az < 0 || az > 360 || el < 5 || el > 70) {
+    status.textContent = "Az must be 0–360 and El 5–70.";
+    return;
+  }
+  const btn = $("manual-go-btn");
+  manualMoving = true;
+  btn.disabled = true;
+  status.textContent = "Moving…";
+  try {
+    const post = (axis, degrees) => api("/api/move", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ axis, degrees }),
+    });
+    await post("az", az);
+    await post("el", el);
+    status.textContent = `Arrived at az ${az}°, el ${el}°.`;
+  } catch (e) {
+    status.textContent = "Move failed: " + e.message;
+  }
+  manualMoving = false;
+  btn.disabled = false;
+  refreshStatus();
+});
+
+$("signal-reset-btn").addEventListener("click", () => {
+  signalPeak = 0;
+  $("signal-peak").textContent = "—";
+});
+
+async function pollSignal() {
+  if (signalPolling || !$("tab-manual").classList.contains("active")
+      || !$("conn-status").classList.contains("connected")) return;
+  signalPolling = true;
+  try {
+    const r = await api("/api/signal");
+    if (r.signal !== null) {
+      signalPeak = Math.max(signalPeak, r.signal);
+      $("signal-value").textContent = r.signal;
+      $("signal-peak").textContent = signalPeak;
+      // Raw units are undocumented, so scale the bar against the peak seen.
+      $("signal-bar").style.width = `${signalPeak ? Math.min(100, (r.signal / signalPeak) * 100) : 0}%`;
+    } else if (r.busy) {
+      $("signal-value").textContent = "busy…";
+    }
+  } catch (e) {
+    /* transient - try again next tick */
+  }
+  signalPolling = false;
+}
+setInterval(pollSignal, 1000);
+
 // ── Connection ───────────────────────────────────────────────────
 
 $("connect-btn").addEventListener("click", async () => {
@@ -854,6 +916,11 @@ async function refreshStatus() {
   trackPill.textContent = status.track.message;
   trackPill.classList.toggle("connected", status.track.running && !status.track.below_horizon);
   trackPill.classList.toggle("disconnected", status.track.below_horizon);
+
+  $("manual-go-btn").disabled = !status.connected || manualMoving;
+  const mp = status.motion.position;
+  $("manual-heading").textContent = (mp.az === null || mp.el === null)
+    ? "unknown" : `az ${mp.az.toFixed(1)}°, el ${mp.el.toFixed(1)}°`;
 
   updateSlipBadge(status.motion);
   refreshCalibrateTab(status.calibrate, status.connected);
