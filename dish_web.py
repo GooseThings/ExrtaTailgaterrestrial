@@ -1197,6 +1197,7 @@ def api_track_load():
     if not is_space_track and source not in dish_track.TLE_SOURCES:
         return jsonify({"ok": False, "error": "Unknown source."}), 400
 
+    notices = []
     try:
         if is_space_track:
             creds = _load_space_track_credentials()
@@ -1204,22 +1205,24 @@ def api_track_load():
                 raise RuntimeError(f"{SPACE_TRACK_CREDENTIALS_FILE} is missing or incomplete.")
             used_source = source
             sats = dish_track.fetch_space_track_catalogue(*creds, dish_track.SPACE_TRACK_QUERIES[source])
+            fetched_at = time.time()
         else:
             # Space-Track needs its own credentialed login, so it isn't
             # part of this automatic Celestrak/AMSAT fallback chain -
             # only tried when explicitly selected, above.
-            used_source, sats = dish_track.fetch_tle_catalogue_with_fallback(source)
-        fetched_at = time.time()
+            used_source, sats, fetched_at, notices = dish_track.fetch_tle_catalogue_with_fallback(source)
         _save_tle_cache(used_source, sats, fetched_at)
         cached_fallback = False
     except Exception as e:
+        notices.append(str(e))
         # Every live option failed (e.g. no internet at all right now) -
         # fall back to whatever was last successfully pulled rather than
         # leaving the user with nothing.
         cached = _load_tle_cache()
         if cached is None:
             print(f"[track/load] {source}: {e}", file=sys.stderr)
-            return jsonify({"ok": False, "error": "Could not load satellite data and no local cache is available."}), 400
+            return jsonify({"ok": False, "error": "Could not load satellite data and no local cache is available.\n\n"
+                                                   + "\n".join(notices)}), 400
         used_source, fetched_at, sats = cached
         cached_fallback = True
 
@@ -1238,6 +1241,7 @@ def api_track_load():
         # that dropdown instead of selecting X.
         "source": used_source,
         "cached_fallback": cached_fallback,
+        "notices": notices,
         "satellites": satellites,
         "ranked": ranked,
     })

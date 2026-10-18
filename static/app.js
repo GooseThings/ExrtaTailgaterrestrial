@@ -465,16 +465,19 @@ $("load-tles-btn").addEventListener("click", async () => {
   btn.disabled = true;
   btn.textContent = "Loading…";
   try {
-    const { satellites, source, ranked, cached_fallback } = await api("/api/track/load", {
+    const { satellites, source, ranked, cached_fallback, notices } = await api("/api/track/load", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ source: requested }),
     });
     renderSatelliteList(satellites, ranked);
+    const details = (notices || []).length ? "\n\n" + notices.join("\n") : "";
     if (source !== requested || cached_fallback) {
       $("tle-source-select").value = source;
       const note = cached_fallback ? " (from local cache, live fetch failed)" : "";
-      alert(`${requested} didn't respond - loaded ${satellites.length} satellites from ${source}${note} instead.`);
+      alert(`${requested} didn't respond - loaded ${satellites.length} satellites from ${source}${note} instead.${details}`);
+    } else if (details) {
+      alert(`Loaded ${satellites.length} satellites from ${source}.${details}`);
     }
   } catch (e) {
     alert("Failed to load satellites: " + e.message);

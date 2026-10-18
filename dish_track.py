@@ -7,15 +7,23 @@
 # Requirements: pip install skyfield pyserial requests
 #
 # Usage: python3 dish_track.py
+import io
+import json
 import math
+import os
 import serial
+import socket
 import threading
+import time
 import tkinter as tk
 from datetime import timedelta
 from tkinter import ttk, messagebox
+from urllib.parse import urlparse, parse_qs
 import requests
 
 import dish_motion
+from sgp4 import exporter, omm
+from sgp4.api import Satrec
 from skyfield.api import load, EarthSatellite, wgs84
 
 # ─────────────────────────────────────────────────────────────────
@@ -37,24 +45,32 @@ UPDATE_INTERVAL = 2.0
 AZ_THRESHOLD = 1.0
 EL_THRESHOLD = 1.0
 
-# Plain-text TLE sources (name/line1/line2 triples) — all parsed the same way
-# by fetch_tle_catalogue(), so adding another provider is just another entry.
-# Celestrak is the biggest catalogue, but it does go down sometimes (or get
-# an IP blacklisted by its abuse protection); AMSAT is a solid fallback
-# (amateur/ham satellites only, but that's usually exactly what you want to
-# track anyway) - and since it's a genuinely different host, it's also
-# tried before any of the other Celestrak-hosted groups below, see
-# fetch_tle_catalogue_with_fallback().
+# Satellite sources, all returned by fetch_tle_catalogue() as
+# (name, line1, line2) triples. Celestrak is fetched as CSV (OMM), since
+# objects cataloged after 2026-07-11 have 6-digit numbers and no TLE-format
+# data there; those are converted to Alpha-5 TLE lines locally. Celestrak
+# fetches follow its usage policy (https://celestrak.org/usage-policy.php):
+# see fetch_celestrak(). AMSAT is plain TLE text on a different host, and
+# is the one fallback for a Celestrak source that can't be fetched.
 AMSAT_SOURCE_NAME = "AMSAT - Amateur Satellites"
 TLE_SOURCES = {
-    "Celestrak - Active Satellites": "https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=tle",
+    "Celestrak - Active Satellites": "https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=csv",
     AMSAT_SOURCE_NAME: "https://amsat.org/tle/current/nasabare.txt",
-    "Celestrak - Stations": "https://celestrak.org/NORAD/elements/gp.php?GROUP=stations&FORMAT=tle",
-    "Celestrak - Visual (Brightest)": "https://celestrak.org/NORAD/elements/gp.php?GROUP=visual&FORMAT=tle",
-    "Celestrak - Weather": "https://celestrak.org/NORAD/elements/gp.php?GROUP=weather&FORMAT=tle",
-    "Celestrak - GPS Operational": "https://celestrak.org/NORAD/elements/gp.php?GROUP=gps-ops&FORMAT=tle",
-    "Celestrak - Starlink": "https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=tle",
+    "Celestrak - Stations": "https://celestrak.org/NORAD/elements/gp.php?GROUP=stations&FORMAT=csv",
+    "Celestrak - Visual (Brightest)": "https://celestrak.org/NORAD/elements/gp.php?GROUP=visual&FORMAT=csv",
+    "Celestrak - Weather": "https://celestrak.org/NORAD/elements/gp.php?GROUP=weather&FORMAT=csv",
+    "Celestrak - GPS Operational": "https://celestrak.org/NORAD/elements/gp.php?GROUP=gps-ops&FORMAT=csv",
+    "Celestrak - Starlink": "https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=csv",
 }
+
+# Celestrak's GP data updates every 2 hours, and the policy asks for at most
+# one download per update - and for clients to stop entirely on any
+# non-200 reply rather than keep retrying (which gets an IP firewalled).
+CELESTRAK_HOST = "celestrak.org"
+CELESTRAK_MIN_INTERVAL = 2 * 3600  # seconds between downloads of one group
+CELESTRAK_PAUSE = 2 * 3600         # seconds to stop all Celestrak requests after an error
+CELESTRAK_CACHE_DIR = "celestrak_cache"
+CELESTRAK_PAUSE_FILE = os.path.join(CELESTRAK_CACHE_DIR, "paused.json")
 
 # Space-Track is the authoritative US government source Celestrak itself
 # pulls from - a genuinely different host from the Celestrak/AMSAT sources
@@ -107,18 +123,155 @@ def dish_az_from_compass(compass_az):
 # TLE
 # ─────────────────────────────────────────────────────────────────
 
-# Celestrak's CDN returns 403 to the default python-requests User-Agent,
-# so a browser-like one is required or every request gets blocked outright.
+# Identify the app honestly, so data providers can tell who is calling and
+# who to contact - never disguise it as a browser to get past a 403, which
+# is a provider telling us to stop.
 REQUEST_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-                  "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "User-Agent": "ExtraTailgaterrestrial/1.0 "
+                  "(+https://github.com/GooseThings/ExrtaTailgaterrestrial)",
 }
 
 
+class CelestrakPaused(requests.RequestException):
+    """Celestrak is off-limits right now (an earlier error, per its usage
+    policy) and there's no cached copy of the requested group to use."""
+
+
+class SourceUnreachable(requests.ConnectionError):
+    """A data source's server didn't accept a connection."""
+
+
+def check_reachable(url, timeout=3):
+    """'Ping' a source before pulling from it: a bare TCP connect to its
+    host and port. Unlike ICMP ping this gets through firewalls that only
+    pass web traffic, and it sends no HTTP request, so it never counts
+    against a provider's download limits. Raises SourceUnreachable."""
+    parts = urlparse(url)
+    port = parts.port or (443 if parts.scheme == "https" else 80)
+    try:
+        with socket.create_connection((parts.hostname, port), timeout=timeout):
+            pass
+    except OSError as e:
+        reason = e.strerror or str(e) or type(e).__name__
+        raise SourceUnreachable(f"{parts.hostname} is unreachable ({reason}).") from e
+
+
+def _fmt_time(ts):
+    return time.strftime("%H:%M", time.localtime(ts))
+
+
+def _celestrak_cache_path(url):
+    group = parse_qs(urlparse(url).query).get("GROUP", ["unknown"])[0]
+    return os.path.join(CELESTRAK_CACHE_DIR, f"{group}.csv")
+
+
+def _celestrak_pause():
+    """(until, reason) if Celestrak requests are paused right now, else None."""
+    try:
+        with open(CELESTRAK_PAUSE_FILE) as f:
+            data = json.load(f)
+        if float(data["until"]) > time.time():
+            return float(data["until"]), data["reason"]
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+    return None
+
+
+def _set_celestrak_pause(reason):
+    until = time.time() + CELESTRAK_PAUSE
+    os.makedirs(CELESTRAK_CACHE_DIR, exist_ok=True)
+    with open(CELESTRAK_PAUSE_FILE, "w") as f:
+        json.dump({"until": until, "reason": reason}, f)
+    return until, reason
+
+
+def _parse_omm_csv(text):
+    """Celestrak CSV (OMM fields) -> (name, line1, line2) triples. Catalog
+    numbers over 99999 come out in Alpha-5 form (100954 -> A0954), which
+    skyfield reads back as the full number."""
+    sats = []
+    for fields in omm.parse_csv(io.StringIO(text)):
+        try:
+            sat = Satrec()
+            omm.initialize(sat, fields)
+            l1, l2 = exporter.export_tle(sat)
+        except (ValueError, KeyError):
+            continue  # malformed row, or a number past Alpha-5's 339999
+        sats.append((fields["OBJECT_NAME"].strip(), l1, l2))
+    return sats
+
+
+def fetch_celestrak(url):
+    """Fetch one Celestrak group per its usage policy. Returns
+    (sats, fetched_at, note), where note is a human-readable explanation
+    when a cached copy was used because Celestrak is paused, else None.
+
+    - A group downloaded less than CELESTRAK_MIN_INTERVAL ago is served
+      from the local cache without contacting Celestrak.
+    - Any non-200 reply (redirects included) or connection failure pauses
+      *all* Celestrak requests for CELESTRAK_PAUSE, persisted across
+      restarts, instead of retrying or moving on to other groups.
+    - While paused, a cached copy of the group (of any age) is used if one
+      exists; otherwise CelestrakPaused is raised."""
+    cache = _celestrak_cache_path(url)
+    cached_at = os.path.getmtime(cache) if os.path.exists(cache) else None
+
+    def from_cache():
+        with open(cache) as f:
+            return _parse_omm_csv(f.read())
+
+    if cached_at is not None and time.time() - cached_at < CELESTRAK_MIN_INTERVAL:
+        return from_cache(), cached_at, None
+
+    note = None
+    pause = _celestrak_pause()
+    if pause is None:
+        try:
+            # An unreachable host never received a request, so this doesn't
+            # pause Celestrak - the next load retries the check right away.
+            check_reachable(url)
+        except SourceUnreachable as e:
+            note = str(e)
+            if cached_at is None:
+                raise
+    if pause is None and note is None:
+        try:
+            # (connect_timeout, read_timeout) - a firewalled IP shows up as
+            # a dead TCP connect, so fail that fast.
+            resp = requests.get(url, headers=REQUEST_HEADERS, timeout=(5, 30),
+                                allow_redirects=False)
+            if resp.status_code != 200:
+                pause = _set_celestrak_pause(f"HTTP {resp.status_code}")
+        except requests.RequestException as e:
+            pause = _set_celestrak_pause(f"connection failed ({type(e).__name__})")
+
+    if pause is not None:
+        until, reason = pause
+        note = (f"Celestrak requests paused until {_fmt_time(until)} after "
+                f"{reason}, per its usage policy.")
+        if cached_at is None:
+            raise CelestrakPaused(note)
+    if note is not None:
+        return from_cache(), cached_at, note + f" Using the copy from {_fmt_time(cached_at)}."
+
+    sats = _parse_omm_csv(resp.text)
+    if not sats:
+        # Same reasoning as the TLE path below - don't let an empty 200
+        # replace a good cached copy.
+        raise requests.RequestException(f"{url} returned no parseable satellites")
+    os.makedirs(CELESTRAK_CACHE_DIR, exist_ok=True)
+    with open(cache + ".tmp", "w") as f:
+        f.write(resp.text)
+    os.replace(cache + ".tmp", cache)
+    return sats, time.time(), None
+
+
 def fetch_tle_catalogue(url):
-    # (connect_timeout, read_timeout) - Celestrak's failure mode here is a
-    # dead TCP connect (SYN never ACKed), not a slow response, so there's
-    # no reason to wait as long for that as for an actual data transfer.
+    """Returns (sats, fetched_at, note) - see fetch_celestrak for note."""
+    if urlparse(url).hostname == CELESTRAK_HOST:
+        return fetch_celestrak(url)
+
+    check_reachable(url)
     resp = requests.get(url, headers=REQUEST_HEADERS, timeout=(5, 15))
     resp.raise_for_status()
 
@@ -142,32 +295,35 @@ def fetch_tle_catalogue(url):
         # cache with nothing.
         raise requests.RequestException(f"{url} returned no parseable satellites")
 
-    return sats
+    return sats, time.time(), None
 
 
 def fetch_tle_catalogue_with_fallback(preferred_name):
-    """Try the preferred source first, then AMSAT (if that wasn't already
-    the preferred one), then whatever's left of TLE_SOURCES. AMSAT goes
-    second specifically because it's the only source here on a genuinely
-    different host - if Celestrak is down/blocked, the other entries
-    above are all Celestrak-hosted too and would just fail the same way,
-    wasting a connect-timeout on each before ever reaching AMSAT.
-    Returns (source_name, sats). Raises the last error if every source
-    fails."""
+    """Try the preferred source, then AMSAT if that wasn't it. Never falls
+    through to other Celestrak groups: when one fails, they all would, and
+    retrying them after an error is what Celestrak's usage policy says gets
+    an IP firewalled.
+    Returns (source_name, sats, fetched_at, notes), where notes is a list
+    of human-readable explanations for anything that didn't go as asked.
+    Raises a RequestException listing every source's error if all fail."""
     names = [preferred_name]
     if preferred_name != AMSAT_SOURCE_NAME:
         names.append(AMSAT_SOURCE_NAME)
-    names.extend(n for n in TLE_SOURCES if n not in names)
 
+    notes = []
     last_error = None
     for name in names:
         try:
-            sats = fetch_tle_catalogue(TLE_SOURCES[name])
-            return name, sats
+            sats, fetched_at, note = fetch_tle_catalogue(TLE_SOURCES[name])
+            if note:
+                notes.append(note)
+            return name, sats, fetched_at, notes
         except requests.RequestException as e:
+            notes.append(f"{name}: {e}")
             last_error = e
 
-    raise last_error
+    # Every source's reason, not just the last one tried.
+    raise requests.RequestException("\n".join(notes)) from last_error
 
 
 def fetch_space_track_catalogue(username, password, query_url):
@@ -176,6 +332,7 @@ def fetch_space_track_catalogue(username, password, query_url):
     rather than risk silently misparsing one of those, this queries the
     GP class as JSON and reads OBJECT_NAME/TLE_LINE1/TLE_LINE2 directly.
     query_url is one of SPACE_TRACK_QUERIES's values."""
+    check_reachable(SPACE_TRACK_LOGIN_URL)
     session = requests.Session()
     resp = session.post(
         SPACE_TRACK_LOGIN_URL,
@@ -270,9 +427,11 @@ class SatelliteTracker:
     def __init__(self, name, l1, l2, lat, lon):
         self.ts = load.timescale()
         self.name = name
-        self.norad_id = l1[2:7].strip()
         self.observer = wgs84.latlon(lat, lon)
         self.satellite = EarthSatellite(l1, l2, name, self.ts)
+        # Parsed rather than sliced from line 1, which holds Alpha-5
+        # numbers (A0954) for catalog numbers over 99999.
+        self.norad_id = str(self.satellite.model.satnum)
         self.diff = self.satellite - self.observer  # precompute
 
     def get_position(self):
@@ -462,10 +621,12 @@ class TrackerApp(tk.Tk):
     def load(self):
         preferred = self.source_var.get()
         try:
-            used_source, sats = fetch_tle_catalogue_with_fallback(preferred)
+            used_source, sats, _, notes = fetch_tle_catalogue_with_fallback(preferred)
         except requests.RequestException as e:
             messagebox.showerror("Download Failed", str(e))
             return
+        if notes:
+            messagebox.showwarning("Satellite Data", "\n".join(notes))
         self.satellites = sats
 
         self.listbox.delete(0, tk.END)
