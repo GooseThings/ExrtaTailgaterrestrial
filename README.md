@@ -29,7 +29,8 @@ sudo apt install ./extratailgaterrestrial_1.0.0_all.deb   # after: ./build_deb.s
 The `.deb` is the recommended path — gives you a real desktop app with a start-menu entry and
 icon. Run `./build_deb.sh` once to build it, then install/remove it the normal way
 (`apt install` / `apt remove` / `apt purge`). It needs internet the first time (sets up its own
-Python environment) and takes a few minutes.
+Python environment) and takes a few minutes. To upgrade to a rebuilt package with the same
+version number, add `--reinstall`.
 
 Prefer running from source instead? `./install.sh` sets up a venv; then either:
 
@@ -57,11 +58,29 @@ Technology, Inc. CDC RS-232 Emulation Demo", and `dmesg | grep tty` shows which 
 | **View Image** | Renders any saved scan as a heatmap, with optional interpolation |
 | **Track** | Pulls live TLE data and drives the dish to follow a satellite in real time, with a live ground-track map |
 | **Calibrate** | Points at known Ku-band DBS satellites and compares theory vs. measured signal peak to check (and correct) pointing accuracy |
+| **Manual** | Point the dish at a typed-in az/el and watch a live signal meter |
 | **Location** | Sets where the dish is sitting, used for all tracking/calibration math |
 
 One quirk worth knowing: the Tailgater measures azimuth **counter-clockwise** from the coax jack
 ("North" = 0°), backwards from a standard compass — the app handles this conversion internally, but
 raw saved data is in the dish's own frame. Valid elevation is roughly 5–70°.
+
+The app converts degrees to the board's raw sensor counts itself and moves with the firmware's
+closed-loop `azacc`/`elacc` commands (accurate to about ±2 counts). It skips the firmware's own
+degree commands, whose azimuth table is broken between 200° and 212°. The board's full command
+set, NVRAM layout and quirks are documented in [docs/FIRMWARE.md](docs/FIRMWARE.md).
+
+## Satellite data
+
+The Track tab can load from Celestrak, AMSAT, or Space-Track (needs a free account; put the
+credentials in `space_track_credentials.json`). Before each download the app checks the server
+is reachable, and tells you if it isn't. Celestrak downloads follow its
+[usage policy](https://celestrak.org/usage-policy.php):
+
+- Each list is downloaded at most once every 2 hours. Loads in between use a local copy.
+- After any error reply, all Celestrak requests pause for 2 hours. The app uses the local copy
+  if it has one, otherwise AMSAT, and tells you why.
+- Data is fetched as CSV, so satellites numbered 100000 and up are included.
 
 Command-line scripts (`dish_scan.py`, `dish_image.py`, `dish_track.py`) are also available for
 scripting/automation outside the app — see the comment header at the top of each file.
