@@ -21,16 +21,29 @@ Tailgater serial-protocol reverse-engineering and scan pipeline (2023).
 
 ## Install
 
+The recommended way is the project's signed apt repository (Debian/Ubuntu). It gives you a real
+desktop app with a start-menu entry and icon, and updates arrive with `sudo apt upgrade`:
+
 ```
-./install.sh
-sudo apt install ./extratailgaterrestrial_1.1.0_all.deb   # after: ./build_deb.sh
+curl -fsSL https://goosethings.github.io/ExrtaTailgaterrestrial/extratailgaterrestrial.gpg \
+  | sudo tee /usr/share/keyrings/extratailgaterrestrial.gpg >/dev/null
+echo "deb [signed-by=/usr/share/keyrings/extratailgaterrestrial.gpg] https://goosethings.github.io/ExrtaTailgaterrestrial stable main" \
+  | sudo tee /etc/apt/sources.list.d/extratailgaterrestrial.list
+sudo apt update
+sudo apt install extratailgaterrestrial
 ```
 
-The `.deb` is the recommended path — gives you a real desktop app with a start-menu entry and
-icon. Run `./build_deb.sh` once to build it, then install/remove it the normal way
-(`apt install` / `apt remove` / `apt purge`). It needs internet the first time (sets up its own
-Python environment) and takes a few minutes. To upgrade to a rebuilt package with the same
-version number, add `--reinstall`.
+The signing key's fingerprint is `7542 B1C3 BC68 5BC9 2DB6 7704 43C9 39F1 CAC0 BC63`. Install
+needs internet the first time (the package sets up its own Python environment) and takes a few
+minutes. Remove it with `sudo apt remove extratailgaterrestrial` (or `apt purge`).
+
+Each [release](https://github.com/GooseThings/ExrtaTailgaterrestrial/releases) also has the
+`.deb` attached, or build it yourself with `./install.sh` then `./build_deb.sh`, and install it
+with `sudo apt install ./extratailgaterrestrial_<version>_all.deb`. To reinstall a rebuilt
+package with the same version number, add `--reinstall`.
+
+Maintainers publish a new version to the apt repository with `./build_deb.sh` then
+`./publish_apt_repo.sh` (after bumping `__version__` in `version.py`).
 
 Prefer running from source instead? `./install.sh` sets up a venv; then either:
 
