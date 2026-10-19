@@ -9,9 +9,9 @@
 # since it reads/writes those relative to whatever directory it's run from,
 # same as running from source.
 #
-# Linux only for now - PyInstaller doesn't cross-compile, so producing a
-# Windows .exe needs this script run on an actual Windows machine (see the
-# README's "Windows" note for what else that would take).
+# Linux build. PyInstaller doesn't cross-compile; the Windows package is a
+# separate installer, built on Windows by packaging/windows/build.ps1. The
+# release CI (.github/workflows/release-packages.yml) builds both.
 #
 # Usage: ./build_standalone.sh
 # Output: dist/dish_web (run it directly, no venv/activation needed)

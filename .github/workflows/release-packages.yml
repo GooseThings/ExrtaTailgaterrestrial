@@ -1,0 +1,149 @@
+# Builds the Linux and Windows packages and attaches them to a release:
+#   extratailgaterrestrial_<version>_all.deb          Debian/Ubuntu package
+#   extratailgaterrestrial-<version>-linux-x86_64     portable Linux binary (browser UI)
+#   ExtraTailgaterrestrial-<version>-setup.exe        Windows installer
+#
+# Runs when a release is published (its tag must match version.py, e.g. v1.2.0).
+# Run it by hand (Actions > Release packages > Run workflow) to test-build
+# without a release: the packages are then uploaded as workflow artifacts
+# instead, or attached to an existing release if you give its tag.
+
+name: Release packages
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag to attach packages to (blank = test build, artifacts only)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+env:
+  TAG: ${{ github.event.release.tag_name || inputs.tag }}
+
+jobs:
+  linux:
+    runs-on: ubuntu-22.04  # older glibc, so the portable binary runs on more distros
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG || github.ref }}
+
+      - name: Read version
+        run: |
+          v=$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' version.py)
+          if [ -n "$TAG" ] && [ "v$v" != "$TAG" ]; then
+            echo "::error::Tag $TAG doesn't match version.py ($v)"; exit 1
+          fi
+          echo "VERSION=$v" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build .deb
+        run: |
+          pip install --quiet pillow
+          ./build_deb.sh
+
+      - name: Build portable binary
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install --quiet -r requirements.txt pyinstaller
+          ./build_standalone.sh
+          mv dist/dish_web "extratailgaterrestrial-$VERSION-linux-x86_64"
+
+      - name: Smoke test portable binary
+        run: |
+          mkdir smoke && cd smoke
+          "../extratailgaterrestrial-$VERSION-linux-x86_64" > ../smoke.log 2>&1 &
+          pid=$!
+          for i in $(seq 60); do
+            if curl -sf http://127.0.0.1:5000/ | grep -q "v$VERSION"; then ok=1; break; fi
+            sleep 1
+          done
+          kill $pid || true
+          if [ -z "${ok:-}" ]; then cat ../smoke.log; echo "::error::app didn't serve its page"; exit 1; fi
+          echo "Portable binary served the v$VERSION page"
+
+      - name: Attach to release
+        if: env.TAG != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release upload "$TAG" --clobber
+          "extratailgaterrestrial_${VERSION}_all.deb"
+          "extratailgaterrestrial-$VERSION-linux-x86_64"
+
+      - name: Upload test-build artifacts
+        if: env.TAG == ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-packages
+          path: |
+            extratailgaterrestrial_*_all.deb
+            extratailgaterrestrial-*-linux-x86_64
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG || github.ref }}
+
+      - name: Read version
+        shell: pwsh
+        run: |
+          $v = (Select-String -Path version.py -Pattern '^__version__ = "(.+)"$').Matches[0].Groups[1].Value
+          if ($env:TAG -and "v$v" -ne $env:TAG) { Write-Error "Tag $env:TAG doesn't match version.py ($v)"; exit 1 }
+          "VERSION=$v" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Inno Setup (if the runner image lacks it)
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) {
+            choco install innosetup -y --no-progress
+          }
+
+      - name: Build installer
+        shell: pwsh
+        run: ./packaging/windows/build.ps1
+
+      - name: Smoke test the built app
+        shell: pwsh
+        run: |
+          $p = Start-Process -PassThru -FilePath "dist\ExtraTailgaterrestrial\ExtraTailgaterrestrial.exe" -ArgumentList "--no-window"
+          $ok = $false
+          foreach ($i in 1..60) {
+            try {
+              $r = Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:5000/" -TimeoutSec 2
+              if ($r.Content -match "v$env:VERSION") { $ok = $true; break }
+            } catch { }
+            Start-Sleep -Seconds 1
+          }
+          Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+          if (-not $ok) { Write-Error "app didn't serve its page"; exit 1 }
+          Write-Host "Windows build served the v$env:VERSION page"
+
+      - name: Attach to release
+        if: env.TAG != ''
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$env:TAG" "dist\ExtraTailgaterrestrial-$env:VERSION-setup.exe" --clobber
+
+      - name: Upload test-build artifact
+        if: env.TAG == ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: dist/ExtraTailgaterrestrial-*-setup.exe

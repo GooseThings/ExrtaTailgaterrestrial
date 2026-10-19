@@ -16,15 +16,37 @@
 #
 # Requirements (beyond requirements.txt): pip install pywebview pyside6 qtpy
 #
-# Usage: python3 dish_app.py
+# Usage: python3 dish_app.py              (or --no-window: server only, at http://127.0.0.1:5000)
 
 import atexit
+import os
 import sys
 import threading
 
-import webview
 
-import dish_web
+def _use_user_data_dir():
+    """dish_web keeps its state files (location, settings, scans, caches)
+    in the current directory. A frozen build (the Windows installer) lives
+    somewhere read-only like Program Files, so give it a per-user data
+    directory instead - the Linux package's launcher does the same with
+    ~/.local/share/extratailgaterrestrial."""
+    if sys.platform == "win32":
+        base = os.environ.get("LOCALAPPDATA") or os.path.expanduser(r"~\AppData\Local")
+        path = os.path.join(base, "ExtraTailgaterrestrial")
+    else:
+        base = os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share")
+        path = os.path.join(base, "extratailgaterrestrial")
+    os.makedirs(path, exist_ok=True)
+    os.chdir(path)
+
+
+# Before importing dish_web, which reads its state files at import time.
+if getattr(sys, "frozen", False):
+    _use_user_data_dir()
+
+import webview  # noqa: E402
+
+import dish_web  # noqa: E402
 
 # Covers process exits that don't go through the window-closing event below
 # at all - Ctrl+C in the launching terminal, or closing that terminal,
@@ -41,6 +63,12 @@ STARTUP_TIMEOUT = 15  # seconds to wait for the server to actually bind
 
 
 def main():
+    if "--no-window" in sys.argv:
+        # Just the server, in the foreground - for headless use and for the
+        # release builds' smoke test (CI machines have no display).
+        dish_web.run_server()
+        return
+
     ready = threading.Event()
     threading.Thread(target=dish_web.run_server, args=(ready,), daemon=True).start()
 

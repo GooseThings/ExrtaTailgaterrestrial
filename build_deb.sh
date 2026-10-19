@@ -25,15 +25,22 @@ fi
 PKG=extratailgaterrestrial
 OUT="${PKG}_${VERSION}_all.deb"
 
+# Python with Pillow is needed for the icons: the project venv if there is
+# one, else any python3 that has Pillow (e.g. on the release CI).
 VENV_DIR=".venv"
-if [ ! -d "$VENV_DIR" ]; then
-    echo "No $VENV_DIR found - run ./install.sh first (needed to render the icon)." >&2
+if [ -x "$VENV_DIR/bin/python3" ]; then
+    PYTHON="$VENV_DIR/bin/python3"
+else
+    PYTHON=python3
+fi
+if ! "$PYTHON" -c "import PIL" 2>/dev/null; then
+    echo "Need Python with Pillow for the icons - run ./install.sh first (or: pip install pillow)." >&2
     exit 1
 fi
 
 if [ ! -f packaging/icon.png ]; then
     echo "Rendering icon..."
-    "$VENV_DIR/bin/python3" packaging/generate_icon.py
+    "$PYTHON" packaging/generate_icon.py
 fi
 
 STAGE="$(mktemp -d)"
@@ -75,7 +82,7 @@ echo "Rendering icon sizes..."
 for size in 16 24 32 48 64 128 256 512; do
     dir="$STAGE/usr/share/icons/hicolor/${size}x${size}/apps"
     mkdir -p "$dir"
-    "$VENV_DIR/bin/python3" - "$size" "$dir/$PKG.png" <<'EOF'
+    "$PYTHON" - "$size" "$dir/$PKG.png" <<'EOF'
 import sys
 from PIL import Image
 size, out = int(sys.argv[1]), sys.argv[2]

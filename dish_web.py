@@ -198,6 +198,24 @@ def _migrate_tle_cache():
 # SHARED STATE
 # ────────────────────────────────────────────────────────────────
 
+# The Tailgater's board enumerates as a Microchip USB CDC serial device.
+DISH_USB_IDS = {(0x04D8, 0x000A)}
+
+
+def find_dish_port():
+    """The dish's serial port if it's plugged in (matched by USB ID, so it
+    works for /dev/ttyACM* on Linux and COMx on Windows alike), else the
+    usual default for this OS."""
+    try:
+        from serial.tools import list_ports
+        for p in list_ports.comports():
+            if (p.vid, p.pid) in DISH_USB_IDS:
+                return p.device
+    except Exception:
+        pass
+    return "COM3" if sys.platform == "win32" else "/dev/ttyACM0"
+
+
 state_lock = threading.Lock()
 
 # Serial port is single-owner: exactly one of a manual move, a scan, or a
@@ -209,7 +227,7 @@ dish_io_lock = threading.Lock()
 
 state = {
     "dish": None,
-    "port": "/dev/ttyACM0",
+    "port": find_dish_port(),
 
     "scan_thread": None,
     "scan_stop": None,
@@ -793,8 +811,11 @@ def _restart_process():
     # only unwinds this one thread) immediately tears down every fd this
     # process holds, freeing the port for the successor to bind.
     time.sleep(1.0)
+    # A frozen build (PyInstaller) is its own executable, so argv[0] isn't a
+    # script to hand to an interpreter.
+    cmd = [sys.executable] + (sys.argv[1:] if getattr(sys, "frozen", False) else sys.argv)
     subprocess.Popen(
-        [sys.executable] + sys.argv,
+        cmd,
         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         start_new_session=True,
     )
@@ -1697,7 +1718,15 @@ def _stop_track():
 
 @app.route("/")
 def index():
-    return render_template("index.html", version=version.__version__, repo_url=version.REPO_URL)
+    with state_lock:
+        connected = bool(state["dish"] and state["dish"].is_open)
+        port = state["port"]
+    if not connected:
+        # Re-detect on each page load, so plugging the dish in (or it
+        # landing on a different port) doesn't need an app restart.
+        port = find_dish_port()
+    return render_template("index.html", version=version.__version__, repo_url=version.REPO_URL,
+                           port=port)
 
 
 def stop_all_work():

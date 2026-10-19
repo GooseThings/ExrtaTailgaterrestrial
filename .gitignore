@@ -25,3 +25,6 @@ celestrak_cache/
 *.rev
 *.gpg
 *.key
+
+# Rendered from packaging/icon.png by packaging/windows/build.ps1
+packaging/windows/icon.ico
