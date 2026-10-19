@@ -156,8 +156,16 @@ main > .tab-panel.active { flex: 1; }
 
 #observer-lat, #observer-lon { width: 110px; }
 
+/* The Track tab fills the window like Location does: the grid takes the
+   height left below the header, and the map takes what's left of the
+   right-hand column under the satellite info box. */
+#tab-track.active { display: flex; flex-direction: column; }
+#tab-track > .panel-grid { flex: 1; }
+.track-map-col { display: flex; flex-direction: column; }
+
 #track-map {
-  height: 320px;
+  flex: 1;
+  min-height: 320px;
   border: 1px solid #45475a;
   border-radius: 6px;
   margin-top: 12px;
