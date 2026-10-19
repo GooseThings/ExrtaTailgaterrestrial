@@ -74,19 +74,23 @@ def _read(dish, settle):
     return dish.read(2000).decode(errors='replace')
 
 
-def _wait_stopped(dish, axis, cancel_event):
+def _wait_stopped(dish, axis, cancel_event, already_read=''):
     """Read until the firmware's async "Stopped at Az/El: N" line, the
-    timeout, or a cancel. Returns True if the move reported completion."""
+    timeout, or a cancel. Returns True if the move reported completion.
+
+    `already_read` is whatever was read since the command was sent - a
+    short move can finish before the ack read is over, so its "Stopped at"
+    line is already in there and won't arrive again."""
     label = 'Az' if axis == 'az' else 'El'
-    buf = ''
+    buf = already_read
     deadline = time.time() + MOVE_TIMEOUT
     while time.time() < deadline:
+        if f'Stopped at {label}:' in buf:
+            return True
         if _cancelled(cancel_event):
             return False
         buf += dish.read(256).decode(errors='replace')
-        if f'Stopped at {label}:' in buf:
-            return True
-    return False
+    return f'Stopped at {label}:' in buf
 
 
 def _move_and_check(dish, axis, deg, cancel_event):
@@ -108,7 +112,7 @@ def _move_and_check(dish, axis, deg, cancel_event):
         if c:
             _send(dish, f"{'azim' if axis == 'az' else 'elev'} {int(c.group(1))}")
         return None, None
-    _wait_stopped(dish, axis, cancel_event)
+    _wait_stopped(dish, axis, cancel_event, already_read=ack)
     raw = _query_raw(dish, 'azim' if axis == 'az' else 'elev')
     return target, raw
 
@@ -270,6 +274,21 @@ def verify_position(dish, axis, expected_deg, tolerance=DEFAULT_TOLERANCE,
 
     Returns the raw-count diff (None if cancelled or never readable).
     """
+    return move_to(dish, axis, round(expected_deg), tolerance=tolerance,
+                   on_warning=on_warning, retries=retries, cancel_event=cancel_event)
+
+
+def move_to(dish, axis, target_deg, tolerance=DEFAULT_TOLERANCE,
+            on_warning=None, retries=DEFAULT_RETRIES, cancel_event=None):
+    """
+    One verified closed-loop move straight to `target_deg`, which may be
+    fractional (unlike stepped_move, which steps in whole degrees). Meant
+    for short moves - there's no chunking, so a long one is exposed to
+    the drive-wheel slip stepped_move guards against.
+
+    Retries and warns exactly like verify_position. Returns the raw-count
+    diff (None if cancelled or never readable).
+    """
     if axis not in ('az', 'el'):
         raise ValueError(f"Unknown axis: {axis}")
 
@@ -278,7 +297,7 @@ def verify_position(dish, axis, expected_deg, tolerance=DEFAULT_TOLERANCE,
         if _cancelled(cancel_event):
             return None
 
-        dest_count, raw = _move_and_check(dish, axis, round(expected_deg), cancel_event)
+        dest_count, raw = _move_and_check(dish, axis, target_deg, cancel_event)
         unreadable = raw is None or dest_count is None
         diff = None if unreadable else (raw - dest_count)
 
@@ -289,7 +308,7 @@ def verify_position(dish, axis, expected_deg, tolerance=DEFAULT_TOLERANCE,
             if on_warning:
                 on_warning({
                     "axis": axis,
-                    "target_deg": expected_deg,
+                    "target_deg": target_deg,
                     "dest_count": dest_count,
                     "settled_raw": raw,
                     "diff": diff,
