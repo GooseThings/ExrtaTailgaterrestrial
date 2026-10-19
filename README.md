@@ -23,7 +23,7 @@ Tailgater serial-protocol reverse-engineering and scan pipeline (2023).
 
 ```
 ./install.sh
-sudo apt install ./extratailgaterrestrial_1.0.0_all.deb   # after: ./build_deb.sh
+sudo apt install ./extratailgaterrestrial_1.1.0_all.deb   # after: ./build_deb.sh
 ```
 
 The `.deb` is the recommended path — gives you a real desktop app with a start-menu entry and

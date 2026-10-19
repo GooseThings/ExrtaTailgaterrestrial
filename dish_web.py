@@ -28,6 +28,7 @@ import dish_image
 import dish_motion
 import dish_time
 import dish_track
+import version
 
 app = Flask(__name__)
 # This app's static/*.js and templates get edited and the server restarted
@@ -1640,7 +1641,7 @@ def _stop_track():
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return render_template("index.html", version=version.__version__, repo_url=version.REPO_URL)
 
 
 def stop_all_work():

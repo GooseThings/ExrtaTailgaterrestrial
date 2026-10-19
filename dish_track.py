@@ -22,6 +22,7 @@ from urllib.parse import urlparse, parse_qs
 import requests
 
 import dish_motion
+import version
 from sgp4 import exporter, omm
 from sgp4.api import Satrec
 from skyfield.api import load, EarthSatellite, wgs84
@@ -127,8 +128,7 @@ def dish_az_from_compass(compass_az):
 # who to contact - never disguise it as a browser to get past a 403, which
 # is a provider telling us to stop.
 REQUEST_HEADERS = {
-    "User-Agent": "ExtraTailgaterrestrial/1.0 "
-                  "(+https://github.com/GooseThings/ExrtaTailgaterrestrial)",
+    "User-Agent": f"ExtraTailgaterrestrial/{version.__version__} (+{version.REPO_URL})",
 }
 
 

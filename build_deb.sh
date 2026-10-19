@@ -12,12 +12,16 @@
 # /opt/extratailgaterrestrial/.venv and installs into it at install time,
 # which needs internet access and takes a few minutes the first time.
 #
-# Usage: ./build_deb.sh [version]   (default: 1.0.0)
+# Usage: ./build_deb.sh [version]   (default: __version__ from version.py)
 
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
 
-VERSION="${1:-1.0.0}"
+VERSION="${1:-$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' version.py)}"
+if [ -z "$VERSION" ]; then
+    echo "Couldn't read __version__ from version.py - pass a version explicitly." >&2
+    exit 1
+fi
 PKG=extratailgaterrestrial
 OUT="${PKG}_${VERSION}_all.deb"
 
@@ -45,7 +49,7 @@ install -m 755 packaging/postrm "$STAGE/DEBIAN/postrm"
 APPDIR="$STAGE/opt/$PKG"
 mkdir -p "$APPDIR"
 cp dish_app.py dish_web.py dish_track.py dish_motion.py dish_calibrate.py \
-   dish_image.py dish_scan.py dish_time.py requirements.txt "$APPDIR/"
+   dish_image.py dish_scan.py dish_time.py version.py requirements.txt "$APPDIR/"
 cp -r templates static "$APPDIR/"
 
 mkdir -p "$STAGE/usr/bin"
