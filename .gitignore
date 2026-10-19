@@ -19,3 +19,9 @@ dist/
 
 # Celestrak per-group download cache + error pause (see dish_track.fetch_celestrak)
 celestrak_cache/
+
+# GPG key material (apt repo signing key, revocation certificates) - never commit
+*.asc
+*.rev
+*.gpg
+*.key
