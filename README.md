@@ -71,10 +71,21 @@ set, NVRAM layout and quirks are documented in [docs/FIRMWARE.md](docs/FIRMWARE.
 
 ## Satellite data
 
-The Track tab can load from Celestrak, AMSAT, or Space-Track (needs a free account; put the
-credentials in `space_track_credentials.json`). Before each download the app checks the server
-is reachable, and tells you if it isn't. Celestrak downloads follow its
-[usage policy](https://celestrak.org/usage-policy.php):
+The Track tab can load from Celestrak, AMSAT, or Space-Track. Before each download the app checks
+the server is reachable, and tells you if it isn't.
+
+Space-Track needs a [free account](https://www.space-track.org/auth/createAccount). Its sources
+only appear once you save the login as `space_track_credentials.json`:
+
+```
+{"username": "you@example.com", "password": "…"}
+```
+
+The installed app (`.deb`) reads it from `~/.local/share/extratailgaterrestrial/`; when running
+from source, put it in the directory you run the app from. Keep it private with
+`chmod 600 space_track_credentials.json`. If it's missing, the Track tab says where it looked.
+
+Celestrak downloads follow its [usage policy](https://celestrak.org/usage-policy.php):
 
 - Each list is downloaded at most once every 2 hours. Loads in between use a local copy.
 - After any error reply, all Celestrak requests pause for 2 hours. The app uses the local copy
