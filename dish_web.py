@@ -10,6 +10,7 @@
 import glob
 import io
 import json
+import math
 import os
 import subprocess
 import sys
@@ -200,6 +201,17 @@ state = {
         "error": None,
     },
 
+    "sweep_thread": None,
+    "sweep_stop": None,
+    "sweep": {
+        "running": False,
+        "done": 0,
+        "total": 0,
+        "samples": [],  # {t, az, el, dist, signal} - dist is degrees along the line
+        "last_file": None,
+        "error": None,
+    },
+
     "observer": _load_observer(),
     "correction": _load_correction(),
     "track_settings": _load_track_settings(),
@@ -369,6 +381,7 @@ def api_status():
             "port": state["port"],
             "scan": {k: v for k, v in state["scan"].items() if k != "log"},
             "calibrate": {k: v for k, v in state["calibrate"].items() if k != "log"},
+            "sweep": {k: v for k, v in state["sweep"].items() if k != "samples"},
             "track": state["track"],
             "motion": {
                 "step_size": state["motion"]["step_size"],
@@ -469,6 +482,158 @@ def api_signal():
     return jsonify({"ok": True, "busy": False, "signal": signal})
 
 
+# ────────────────────────────────────────────────────────────────
+# POINT-TO-POINT SWEEP (Manual tab)
+# ────────────────────────────────────────────────────────────────
+
+SWEEP_MAX_POINTS = 2000
+
+
+def _sweep_points(az0, el0, az1, el1, step):
+    """Evenly spaced (az, el, dist) points on the straight az/el line from
+    start to end, at most `step` degrees apart, both ends included. Azimuth
+    runs directly between the two values rather than wrapping through 0,
+    since the dish's azimuth is one continuous span, not a circle."""
+    length = math.hypot(az1 - az0, el1 - el0)
+    n = max(1, math.ceil(length / step))
+    return [(az0 + (az1 - az0) * i / n, el0 + (el1 - el0) * i / n, length * i / n)
+            for i in range(n + 1)]
+
+
+def _run_sweep(dish, points, stop_event):
+    out_file = f"sweep-{time.strftime('%Y%m%d-%H%M%S')}.csv"
+    try:
+        # The approach to the start can be long, so it goes through the
+        # chunked, slip-checked move; the line itself is short hops.
+        az0, el0, _ = points[0]
+        _safe_move(dish, 'az', az0, cancel_event=stop_event)
+        _safe_move(dish, 'el', el0, cancel_event=stop_event)
+        with state_lock:
+            tolerance = state["motion"]["tolerance"]
+        last_count = {'az': dish_motion.deg_to_count('az', az0),
+                      'el': dish_motion.deg_to_count('el', el0)}
+
+        with open(out_file, "w") as f:
+            f.write("time,azimuth,elevation,distance,signal\n")
+            for i, (az, el, dist) in enumerate(points):
+                if stop_event.is_set():
+                    break
+                # The firmware can only drive one axis at a time, so each hop
+                # is az then el; at small steps that tracks the line closely.
+                # An axis whose count doesn't change (e.g. a flat line's el)
+                # isn't re-sent.
+                for axis, deg in (('az', az), ('el', el)):
+                    count = dish_motion.deg_to_count(axis, deg)
+                    if i and count != last_count[axis]:
+                        dish_motion.move_to(dish, axis, deg, tolerance=tolerance,
+                                            on_warning=_record_motion_warning,
+                                            cancel_event=stop_event)
+                        last_count[axis] = count
+                if stop_event.is_set():
+                    break
+                signal = read_signal_strength(dish, stop_event)
+                if signal is None:
+                    break
+                now = time.time()
+                f.write(f"{now:.1f},{az:.2f},{el:.2f},{dist:.2f},{signal}\n")
+                f.flush()
+                with state_lock:
+                    state["sweep"]["samples"].append({
+                        "t": now, "az": round(az, 2), "el": round(el, 2),
+                        "dist": round(dist, 2), "signal": signal,
+                    })
+                    state["sweep"]["done"] = i + 1
+                    state["motion"]["position"]["az"] = az
+                    state["motion"]["position"]["el"] = el
+        with state_lock:
+            state["sweep"]["last_file"] = out_file
+    except Exception as e:
+        with state_lock:
+            state["sweep"]["error"] = str(e)
+    finally:
+        with state_lock:
+            state["sweep"]["running"] = False
+        dish_io_lock.release()
+
+
+@app.route("/api/sweep/start", methods=["POST"])
+def api_sweep_start():
+    p = request.json or {}
+    try:
+        az0, el0 = float(p["az_start"]), float(p["el_start"])
+        az1, el1 = float(p["az_end"]), float(p["el_end"])
+        step = float(p.get("step", 1.0))
+    except (KeyError, ValueError, TypeError):
+        return jsonify({"ok": False, "error": "Start and end az/el are required numbers."}), 400
+    # Never let a bad number reach the firmware - it executes garbage as 0.
+    if not all(math.isfinite(v) for v in (az0, el0, az1, el1, step)):
+        return jsonify({"ok": False, "error": "Values must be finite numbers."}), 400
+    if not (0 <= az0 <= 360 and 0 <= az1 <= 360):
+        return jsonify({"ok": False, "error": "Azimuth must be 0–360."}), 400
+    if not (dish_motion.MIN_ELEVATION <= el0 <= dish_motion.MAX_ELEVATION
+            and dish_motion.MIN_ELEVATION <= el1 <= dish_motion.MAX_ELEVATION):
+        return jsonify({"ok": False, "error": f"Elevation must be "
+                        f"{dish_motion.MIN_ELEVATION}–{dish_motion.MAX_ELEVATION}."}), 400
+    if not 0.2 <= step <= 10:
+        return jsonify({"ok": False, "error": "Step must be 0.2–10°."}), 400
+    points = _sweep_points(az0, el0, az1, el1, step)
+    if len(points) > SWEEP_MAX_POINTS:
+        return jsonify({"ok": False, "error": f"That's {len(points)} points - use a larger step "
+                        f"(max {SWEEP_MAX_POINTS})."}), 400
+
+    with state_lock:
+        dish = state["dish"]
+        if not dish or not dish.is_open:
+            return jsonify({"ok": False, "error": "Connect to the dish first."}), 400
+        if not dish_io_lock.acquire(blocking=False):
+            return jsonify({"ok": False, "error": "Dish is busy with another operation."}), 409
+        stop_event = threading.Event()
+        state["sweep_stop"] = stop_event
+        state["sweep"] = {"running": True, "done": 0, "total": len(points),
+                          "samples": [], "last_file": None, "error": None}
+        thread = threading.Thread(target=_run_sweep, args=(dish, points, stop_event), daemon=True)
+        state["sweep_thread"] = thread
+        thread.start()
+    return jsonify({"ok": True, "total": len(points)})
+
+
+@app.route("/api/sweep/stop", methods=["POST"])
+def api_sweep_stop():
+    _stop_sweep()
+    return jsonify({"ok": True})
+
+
+def _stop_sweep():
+    with state_lock:
+        thread = state["sweep_thread"]
+        stop_event = state["sweep_stop"]
+    if stop_event:
+        stop_event.set()
+    if thread:
+        # See _stop_scan()'s comment - same reasoning.
+        thread.join(timeout=20)
+
+
+@app.route("/api/sweep")
+def api_sweep():
+    """Sweep progress plus samples from index `since` on, so the page can
+    poll for just what's new."""
+    since = max(0, request.args.get("since", 0, type=int))
+    with state_lock:
+        s = state["sweep"]
+        return jsonify({**{k: v for k, v in s.items() if k != "samples"},
+                        "samples": s["samples"][since:]})
+
+
+@app.route("/api/sweep/download")
+def api_sweep_download():
+    filename = request.args.get("file", "")
+    if (os.path.basename(filename) != filename or not filename.startswith("sweep-")
+            or not filename.endswith(".csv") or not os.path.exists(filename)):
+        return jsonify({"error": "invalid filename"}), 400
+    return send_file(os.path.abspath(filename), mimetype="text/csv", as_attachment=True)
+
+
 @app.route("/api/connect", methods=["POST"])
 def api_connect():
     port = (request.json or {}).get("port", state["port"])
@@ -505,6 +670,7 @@ def api_disconnect():
     _stop_scan()
     _stop_track()
     _stop_calibrate()
+    _stop_sweep()
     with state_lock:
         if state["dish"] and state["dish"].is_open:
             state["dish"].close()
@@ -541,6 +707,7 @@ def _restart_process():
 def api_system_reboot():
     _stop_scan()
     _stop_track()
+    _stop_sweep()
     with state_lock:
         if state["dish"] and state["dish"].is_open:
             state["dish"].close()
@@ -1402,7 +1569,7 @@ def index():
 
 
 def stop_all_work():
-    """Requests cancellation of any running scan/calibrate/track work and
+    """Requests cancellation of any running scan/calibrate/track/sweep work and
     blocks until each has actually finished, not just been told to.
 
     Used by dish_app.py's window-close handler. Closing a browser tab on
@@ -1415,6 +1582,7 @@ def stop_all_work():
     _stop_scan()
     _stop_calibrate()
     _stop_track()
+    _stop_sweep()
 
 
 def run_server(ready_event=None):

@@ -20,11 +20,206 @@ document.querySelectorAll(".tab-btn").forEach((btn) => {
   });
 });
 
+// ── Line chart ───────────────────────────────────────────────────
+
+// Single-series canvas line chart: 2px line, hairline grid, crosshair +
+// tooltip on hover. setData(points, [xMin, xMax]) with points sorted by x,
+// each {x, y, ...}; the extra fields are handed to opts.tooltip(point).
+function niceTicks(min, max, count = 4) {
+  if (min === max) { min -= 1; max += 1; }
+  const raw = (max - min) / count;
+  const mag = 10 ** Math.floor(Math.log10(raw));
+  const step = [1, 2, 5, 10].map((m) => m * mag).find((s) => s >= raw);
+  const lo = Math.floor(min / step) * step;
+  const hi = Math.ceil(max / step) * step;
+  const ticks = [];
+  for (let v = lo; v <= hi + step / 2; v += step) ticks.push(Number(v.toFixed(10)));
+  return { lo, hi, ticks };
+}
+
+function createLineChart(container, opts) {
+  const canvas = document.createElement("canvas");
+  const tip = document.createElement("div");
+  tip.className = "chart-tooltip";
+  tip.hidden = true;
+  const empty = document.createElement("div");
+  empty.className = "chart-empty";
+  empty.textContent = opts.emptyText;
+  container.append(canvas, tip, empty);
+
+  const pad = { l: 52, r: 14, t: 18, b: 30 };
+  let points = [];
+  let domain = [0, 1];
+  let hoverIdx = null;
+
+  function draw() {
+    const w = container.clientWidth;
+    const h = container.clientHeight;
+    if (!w || !h) return; // hidden tab - redrawn when it's shown (ResizeObserver)
+    const css = getComputedStyle(document.documentElement);
+    const ink = css.getPropertyValue("--text").trim();
+    const accent = css.getPropertyValue("--accent").trim();
+    const surface = css.getPropertyValue("--panel").trim();
+    const grid = "#45475a";
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(h * dpr);
+    const ctx = canvas.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+
+    empty.hidden = points.length > 0;
+    if (!points.length) { tip.hidden = true; return; }
+
+    let [x0, x1] = domain;
+    if (x0 === x1) { x0 -= 1; x1 += 1; }
+    const ys = points.map((p) => p.y);
+    const { lo, hi, ticks } = niceTicks(Math.min(...ys), Math.max(...ys));
+    const plotW = w - pad.l - pad.r;
+    const plotH = h - pad.t - pad.b;
+    const sx = (x) => pad.l + ((x - x0) / (x1 - x0)) * plotW;
+    const sy = (y) => pad.t + (1 - (y - lo) / (hi - lo)) * plotH;
+
+    // Recessive hairline grid + y labels in muted ink.
+    ctx.font = "11px system-ui, sans-serif";
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = grid;
+    ctx.fillStyle = ink;
+    ctx.globalAlpha = 0.7;
+    ctx.textAlign = "right";
+    ctx.textBaseline = "middle";
+    ticks.forEach((t) => {
+      const y = Math.round(sy(t)) + 0.5;
+      ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(w - pad.r, y); ctx.stroke();
+      ctx.fillText(t.toLocaleString(), pad.l - 8, y);
+    });
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    opts.xTicks(x0, x1).forEach((t) => {
+      ctx.fillText(opts.xTickLabel(t, x0, x1), sx(t), h - pad.b + 10);
+    });
+    ctx.globalAlpha = 1;
+
+    // The series.
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 2;
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    points.forEach((p, i) => (i ? ctx.lineTo(sx(p.x), sy(p.y)) : ctx.moveTo(sx(p.x), sy(p.y))));
+    ctx.stroke();
+    if (points.length === 1) dot(ctx, sx(points[0].x), sy(points[0].y), accent, surface);
+
+    // Selective direct label: the peak only.
+    if (opts.markPeak) {
+      const peak = points.reduce((a, b) => (b.y > a.y ? b : a));
+      const px = sx(peak.x);
+      const py = sy(peak.y);
+      dot(ctx, px, py, accent, surface);
+      const label = `peak ${peak.y.toLocaleString()}`;
+      const tw = ctx.measureText(label).width;
+      ctx.fillStyle = ink;
+      ctx.textAlign = "left";
+      ctx.textBaseline = "bottom";
+      ctx.fillText(label, Math.min(Math.max(px - tw / 2, pad.l), w - pad.r - tw), py - 7);
+    }
+
+    // Crosshair + tooltip for the hovered point.
+    if (hoverIdx !== null && points[hoverIdx]) {
+      const p = points[hoverIdx];
+      const px = Math.round(sx(p.x)) + 0.5;
+      ctx.strokeStyle = ink;
+      ctx.globalAlpha = 0.4;
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(px, pad.t); ctx.lineTo(px, h - pad.b); ctx.stroke();
+      ctx.globalAlpha = 1;
+      dot(ctx, sx(p.x), sy(p.y), accent, surface);
+
+      const [value, ...rest] = opts.tooltip(p);
+      const strong = document.createElement("strong");
+      strong.textContent = value;
+      tip.replaceChildren(strong, ...rest.map((line) => {
+        const d = document.createElement("div");
+        d.textContent = line;
+        return d;
+      }));
+      tip.hidden = false;
+      const left = px + 12 + tip.offsetWidth > w ? px - 12 - tip.offsetWidth : px + 12;
+      tip.style.left = `${Math.max(0, left)}px`;
+      tip.style.top = `${pad.t}px`;
+    } else {
+      tip.hidden = true;
+    }
+
+    chart.toX = (offsetX) => x0 + ((offsetX - pad.l) / plotW) * (x1 - x0);
+  }
+
+  // >= 8px marker with a 2px surface ring.
+  function dot(ctx, x, y, fill, ring) {
+    ctx.beginPath();
+    ctx.arc(x, y, 4, 0, Math.PI * 2);
+    ctx.fillStyle = fill;
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = ring;
+    ctx.stroke();
+  }
+
+  // The crosshair snaps to the nearest point by x, so the whole plot is
+  // the hit target, not the 2px line.
+  canvas.addEventListener("pointermove", (e) => {
+    if (!points.length || !chart.toX) return;
+    const x = chart.toX(e.offsetX);
+    let best = 0;
+    points.forEach((p, i) => { if (Math.abs(p.x - x) < Math.abs(points[best].x - x)) best = i; });
+    hoverIdx = best;
+    draw();
+  });
+  canvas.addEventListener("pointerleave", () => { hoverIdx = null; draw(); });
+  new ResizeObserver(draw).observe(container);
+
+  const chart = {
+    setData(newPoints, newDomain) {
+      points = newPoints;
+      domain = newDomain;
+      if (hoverIdx !== null && hoverIdx >= points.length) hoverIdx = null;
+      draw();
+    },
+  };
+  return chart;
+}
+
 // ── Manual ───────────────────────────────────────────────────────
 
 let signalPeak = 0;
 let signalPolling = false;
 let manualMoving = false;
+
+// Live signal chart: the last LIVE_WINDOW seconds of readings, from the
+// idle poll below or, during a sweep, from the sweep's own readings.
+const LIVE_WINDOW = 120;
+let liveSamples = [];
+const liveChart = createLineChart($("live-chart"), {
+  emptyText: "Waiting for readings…",
+  xTicks: (x0, x1) => [0, 30, 60, 90, 120].map((s) => x1 - s).filter((t) => t >= x0),
+  xTickLabel: (t, x0, x1) => (Math.round(x1 - t) === 0 ? "now" : `-${Math.round(x1 - t)}s`),
+  tooltip: (p) => [p.y.toLocaleString(), `${Math.max(0, Math.round(Date.now() / 1000 - p.x))} s ago`],
+});
+
+function redrawLiveChart() {
+  const now = Date.now() / 1000;
+  liveSamples = liveSamples.filter((s) => s.x >= now - LIVE_WINDOW);
+  liveChart.setData(liveSamples, [now - LIVE_WINDOW, now]);
+}
+
+function showSignal(value, t) {
+  signalPeak = Math.max(signalPeak, value);
+  $("signal-value").textContent = value;
+  $("signal-peak").textContent = signalPeak;
+  // Raw units are undocumented, so scale the bar against the peak seen.
+  $("signal-bar").style.width = `${signalPeak ? Math.min(100, (value / signalPeak) * 100) : 0}%`;
+  liveSamples.push({ x: t, y: value });
+}
 
 $("manual-go-btn").addEventListener("click", async () => {
   const az = parseFloat($("manual-az").value);
@@ -65,22 +260,120 @@ async function pollSignal() {
       || !$("conn-status").classList.contains("connected")) return;
   signalPolling = true;
   try {
-    const r = await api("/api/signal");
-    if (r.signal !== null) {
-      signalPeak = Math.max(signalPeak, r.signal);
-      $("signal-value").textContent = r.signal;
-      $("signal-peak").textContent = signalPeak;
-      // Raw units are undocumented, so scale the bar against the peak seen.
-      $("signal-bar").style.width = `${signalPeak ? Math.min(100, (r.signal / signalPeak) * 100) : 0}%`;
-    } else if (r.busy) {
-      $("signal-value").textContent = "busy…";
+    // A sweep owns the dish and feeds the meter itself - see pollSweep.
+    if (!sweepPolling) {
+      const r = await api("/api/signal");
+      if (r.signal !== null) {
+        showSignal(r.signal, Date.now() / 1000);
+      } else if (r.busy) {
+        $("signal-value").textContent = "busy…";
+      }
     }
   } catch (e) {
     /* transient - try again next tick */
   }
+  redrawLiveChart();
   signalPolling = false;
 }
 setInterval(pollSignal, 1000);
+
+// ── Manual: point-to-point sweep ─────────────────────────────────
+
+let sweepPolling = false;   // true from a sweep's start until its last samples are in
+let sweepSamples = [];
+let sweepLength = 0;        // degrees along the line, for the chart's x domain
+
+const sweepChart = createLineChart($("sweep-chart"), {
+  emptyText: "Run a sweep to see signal along its path.",
+  xTicks: (x0, x1) => niceTicks(x0, x1).ticks.filter((t) => t >= x0 && t <= x1),
+  xTickLabel: (t) => `${t}°`,
+  markPeak: true,
+  tooltip: (p) => [p.y.toLocaleString(), `az ${p.az}°, el ${p.el}°`, `${p.x}° along the line`],
+});
+
+function sweepInputs() {
+  return ["az-start", "el-start", "az-end", "el-end", "step"].map((k) => parseFloat($(`sweep-${k}`).value));
+}
+
+function updateSweepEstimate() {
+  const [az0, el0, az1, el1, step] = sweepInputs();
+  const out = $("sweep-estimate");
+  if ([az0, el0, az1, el1, step].some(isNaN) || step <= 0) { out.textContent = ""; return; }
+  const n = Math.max(1, Math.ceil(Math.hypot(az1 - az0, el1 - el0) / step)) + 1;
+  // Rough per-point cost: a signal reading, plus an az and/or el hop
+  // (elacc's slow final approach makes el the expensive one).
+  const perPoint = 1 + (az1 !== az0 ? 2 : 0) + (el1 !== el0 ? 5 : 0);
+  out.textContent = `${n} points, roughly ${formatAgo(n * perPoint)} (plus the move to the start).`;
+}
+["az-start", "el-start", "az-end", "el-end", "step"].forEach((k) =>
+  $(`sweep-${k}`).addEventListener("input", updateSweepEstimate));
+updateSweepEstimate();
+
+$("sweep-start-btn").addEventListener("click", async () => {
+  const [az0, el0, az1, el1, step] = sweepInputs();
+  const status = $("sweep-status");
+  if ([az0, el0, az1, el1, step].some(isNaN)) {
+    status.textContent = "Fill in every field.";
+    return;
+  }
+  try {
+    await api("/api/sweep/start", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ az_start: az0, el_start: el0, az_end: az1, el_end: el1, step }),
+    });
+  } catch (e) {
+    status.textContent = "Couldn't start: " + e.message;
+    return;
+  }
+  sweepSamples = [];
+  sweepLength = Math.hypot(az1 - az0, el1 - el0);
+  sweepChart.setData([], [0, sweepLength]);
+  $("sweep-download").hidden = true;
+  status.textContent = "Moving to the start…";
+  sweepPolling = true;
+  refreshStatus();
+});
+
+$("sweep-stop-btn").addEventListener("click", () => api("/api/sweep/stop", { method: "POST" }));
+
+async function pollSweep() {
+  if (!sweepPolling) return;
+  let r;
+  try {
+    r = await api(`/api/sweep?since=${sweepSamples.length}`);
+  } catch (e) {
+    return;
+  }
+  r.samples.forEach((s) => {
+    sweepSamples.push({ x: s.dist, y: s.signal, az: s.az, el: s.el });
+    showSignal(s.signal, s.t);
+  });
+  if (sweepLength === 0 && r.samples.length) {
+    // Page was reloaded mid-sweep - recover the line length from the data.
+    sweepLength = Math.max(...sweepSamples.map((p) => p.x));
+  }
+  sweepChart.setData(sweepSamples, [0, sweepLength]);
+
+  const status = $("sweep-status");
+  if (r.running) {
+    if (r.done) status.textContent = `Point ${r.done} of ${r.total}…`;
+    return;
+  }
+  sweepPolling = false;
+  if (r.error) status.textContent = "Sweep failed: " + r.error;
+  else if (r.done < r.total) status.textContent = `Stopped after ${r.done} of ${r.total} points.`;
+  else status.textContent = `Done - ${r.total} points.`;
+  if (r.last_file) {
+    const link = $("sweep-download");
+    const url = new URL("/api/sweep/download", window.location.origin);
+    url.searchParams.set("file", r.last_file);
+    link.href = url.toString();
+    link.download = r.last_file;
+    link.hidden = false;
+  }
+}
+setInterval(pollSweep, 1000);
 
 // ── Connection ───────────────────────────────────────────────────
 
@@ -192,9 +485,12 @@ async function refreshScanLog() {
   }
 }
 
-// ── View ─────────────────────────────────────────────────────────
+// ── Saved scans ──────────────────────────────────────────────────
 
-async function refreshFiles() {
+// selectNewest: pick the most recent file (the list is newest-first)
+// instead of keeping the current selection - used right after a scan
+// finishes, so its result is ready to render.
+async function refreshFiles(selectNewest = false) {
   const { files } = await api("/api/files");
   const select = $("file-select");
   const current = select.value;
@@ -205,10 +501,10 @@ async function refreshFiles() {
     opt.textContent = f;
     select.appendChild(opt);
   });
-  if (files.includes(current)) select.value = current;
+  if (!selectNewest && files.includes(current)) select.value = current;
 }
 
-$("refresh-files-btn").addEventListener("click", refreshFiles);
+$("refresh-files-btn").addEventListener("click", () => refreshFiles());
 
 $("render-btn").addEventListener("click", () => {
   const file = $("file-select").value;
@@ -917,6 +1213,8 @@ function updateSlipBadge(motion) {
 
 // ── Status polling ───────────────────────────────────────────────
 
+let scanWasRunning = false;
+
 async function refreshStatus() {
   let status;
   try {
@@ -927,8 +1225,15 @@ async function refreshStatus() {
 
   setConnected(status.connected);
 
-  const busy = status.scan.running || status.track.running || status.calibrate.running;
+  const busy = status.scan.running || status.track.running || status.calibrate.running
+    || status.sweep.running;
   updateMotionControls(busy);
+
+  $("sweep-start-btn").disabled = !status.connected || busy || manualMoving;
+  $("sweep-stop-btn").disabled = !status.sweep.running;
+  if (status.sweep.running && !sweepPolling) {
+    sweepPolling = true; // a sweep started before this page loaded - pick it up
+  }
 
   $("scan-start-btn").disabled = !status.connected || status.scan.running;
   $("scan-stop-btn").disabled = !status.scan.running;
@@ -936,7 +1241,10 @@ async function refreshStatus() {
     $("scan-preview").src = `/api/scan/preview.png?t=${Date.now()}`;
     $("scan-preview").hidden = false;
     refreshScanLog();
+  } else if (scanWasRunning) {
+    refreshFiles(true);  // the scan just finished - list its file under Saved scans
   }
+  scanWasRunning = status.scan.running;
 
   $("track-start-btn").disabled = !status.connected || status.track.running;
   $("track-stop-btn").disabled = !status.track.running;
@@ -945,7 +1253,7 @@ async function refreshStatus() {
   trackPill.classList.toggle("connected", status.track.running && !status.track.below_horizon);
   trackPill.classList.toggle("disconnected", status.track.below_horizon);
 
-  $("manual-go-btn").disabled = !status.connected || manualMoving;
+  $("manual-go-btn").disabled = !status.connected || manualMoving || status.sweep.running;
   const mp = status.motion.position;
   $("manual-heading").textContent = (mp.az === null || mp.el === null)
     ? "unknown" : `az ${mp.az.toFixed(1)}°, el ${mp.el.toFixed(1)}°`;

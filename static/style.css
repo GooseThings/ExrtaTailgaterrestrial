@@ -197,6 +197,10 @@ main > .tab-panel.active { flex: 1; }
 .stats-box label input { width: 100%; margin-top: 4px; }
 .stats-box label:last-child { margin-bottom: 0; }
 
+/* Inline controls (e.g. Saved scans' Interpolation) stay inline in a button row. */
+.stats-box .button-row label { display: inline; margin: 0; }
+.stats-box .button-row label input { width: auto; margin-top: 0; }
+
 .checkbox-label {
   display: flex !important;
   align-items: center;
@@ -247,3 +251,51 @@ main > .tab-panel.active { flex: 1; }
   background: var(--good);
   transition: width 0.3s;
 }
+
+.stats-box h3:not(:first-child) { margin-top: 14px; }
+
+/* Canvas line charts (Manual tab) - drawn by createLineChart() in app.js. */
+.chart {
+  position: relative;
+  height: 180px;
+}
+
+.chart canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+
+.chart-tooltip {
+  position: absolute;
+  pointer-events: none;
+  background: var(--bg);
+  border: 1px solid #45475a;
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+.chart-tooltip strong { display: block; font-size: 0.9rem; }
+
+.chart-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  opacity: 0.6;
+}
+
+.chart-empty[hidden] { display: none; }
+
+.sweep-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0 12px;
+}
+
+@media (max-width: 700px) {
+  .sweep-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+#sweep-download { color: var(--accent); font-size: 0.9rem; }

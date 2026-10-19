@@ -32,7 +32,6 @@
 
   <nav class="tabs">
     <button class="tab-btn active" data-tab="scan">Scan</button>
-    <button class="tab-btn" data-tab="view">View Image</button>
     <button class="tab-btn" data-tab="track">Track</button>
     <button class="tab-btn" data-tab="calibrate">Calibrate</button>
     <button class="tab-btn" data-tab="manual">Manual</button>
@@ -41,6 +40,13 @@
 
   <main>
     <section id="tab-scan" class="tab-panel active">
+      <p class="hint">
+        Sweeps the dish row by row across the azimuth/elevation window below, reading RF signal
+        strength at each point, to build a heatmap of Ku-band sources in the sky. Each scan is saved
+        as a data file you can re-render under Saved scans below. Azimuth is in the dish's own frame
+        (counter-clockwise from the coax jack). Low resolution steps 1° at a time; High uses
+        the firmware's ~0.2° nudges, which is much slower.
+      </p>
       <div class="panel-grid">
         <form id="scan-form">
           <label>Azimuth start <input type="number" id="az_start" value="90" min="0" max="360"></label>
@@ -49,8 +55,8 @@
           <label>Elevation end <input type="number" id="el_end" value="70" min="5" max="70"></label>
           <label>Resolution
             <select id="resolution">
-              <option value="1">Low (azangle/elangle)</option>
-              <option value="2">High (nudge)</option>
+              <option value="1">Low (1° steps)</option>
+              <option value="2">High (~0.2° nudges)</option>
             </select>
           </label>
           <div id="estimate"></div>
@@ -64,18 +70,20 @@
           <pre id="scan-log"></pre>
         </div>
       </div>
-    </section>
 
-    <section id="tab-view" class="tab-panel">
-      <div class="button-row">
-        <select id="file-select"></select>
-        <button id="refresh-files-btn">Refresh</button>
-        <label>Interpolation
-          <input type="number" id="interp-factor" value="4" min="1" max="8">
-        </label>
-        <button id="render-btn">Render</button>
+      <div class="stats-box">
+        <h3>Saved scans</h3>
+        <p class="hint">Re-render any saved scan as a heatmap. Interpolation smooths it by that factor.</p>
+        <div class="button-row">
+          <select id="file-select"></select>
+          <button id="refresh-files-btn">Refresh</button>
+          <label>Interpolation
+            <input type="number" id="interp-factor" value="4" min="1" max="8">
+          </label>
+          <button id="render-btn">Render</button>
+        </div>
+        <img id="rendered-image" alt="Rendered heatmap" hidden>
       </div>
-      <img id="rendered-image" alt="Rendered heatmap" hidden>
     </section>
 
     <section id="tab-track" class="tab-panel">
@@ -222,7 +230,35 @@
           <div class="stat-row"><span>Signal</span><span id="signal-value">—</span></div>
           <div class="stat-row"><span>Peak seen</span><span id="signal-peak">—</span></div>
           <div class="button-row"><button id="signal-reset-btn">Reset peak</button></div>
+          <h3>Signal, last 2 minutes</h3>
+          <div class="chart" id="live-chart"></div>
         </div>
+      </div>
+
+      <div class="stats-box">
+        <h3>Point-to-point sweep</h3>
+        <p class="hint">
+          Moves the dish in a straight line from the start az/el to the end az/el, reading signal
+          strength every step. The firmware moves one axis at a time, so each step is a small az
+          hop then an el hop. Azimuth runs directly between the two values and doesn't wrap
+          through 0°. Each sweep is saved as a CSV.
+        </p>
+        <div class="sweep-grid">
+          <label>Start az (°) <input type="number" id="sweep-az-start" value="170" min="0" max="360" step="0.1"></label>
+          <label>Start el (°) <input type="number" id="sweep-el-start" value="30" min="5" max="70" step="0.1"></label>
+          <label>End az (°) <input type="number" id="sweep-az-end" value="190" min="0" max="360" step="0.1"></label>
+          <label>End el (°) <input type="number" id="sweep-el-end" value="40" min="5" max="70" step="0.1"></label>
+          <label>Step (°) <input type="number" id="sweep-step" value="1" min="0.2" max="10" step="0.1"></label>
+        </div>
+        <div id="sweep-estimate" class="hint"></div>
+        <div class="button-row">
+          <button id="sweep-start-btn" disabled>Start Sweep</button>
+          <button id="sweep-stop-btn" disabled>Stop</button>
+          <a id="sweep-download" hidden>Download CSV</a>
+        </div>
+        <div id="sweep-status" class="hint"></div>
+        <h3>Signal along the sweep</h3>
+        <div class="chart" id="sweep-chart"></div>
       </div>
     </section>
 

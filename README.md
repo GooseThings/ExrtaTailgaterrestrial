@@ -54,8 +54,7 @@ Technology, Inc. CDC RS-232 Emulation Demo", and `dmesg | grep tty` shows which 
 
 | Tab | What it does |
 |---|---|
-| **Scan** | Sweeps the dish across an az/el range, recording RF signal strength at each point, with a live heatmap preview |
-| **View Image** | Renders any saved scan as a heatmap, with optional interpolation |
+| **Scan** | Sweeps the dish across an az/el range, recording RF signal strength at each point, with a live heatmap preview. Saved scans can be re-rendered as heatmaps (with optional interpolation) on the same page |
 | **Track** | Pulls live TLE data and drives the dish to follow a satellite in real time, with a live ground-track map |
 | **Calibrate** | Points at known Ku-band DBS satellites and compares theory vs. measured signal peak to check (and correct) pointing accuracy |
 | **Manual** | Point the dish at a typed-in az/el and watch a live signal meter |
