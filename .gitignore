@@ -3,6 +3,7 @@ __pycache__/
 observer_location.json
 track_settings.json
 tle_cache.json
+tle_cache/
 space_track_credentials.json
 pointing_correction.json
 calibration-*.json

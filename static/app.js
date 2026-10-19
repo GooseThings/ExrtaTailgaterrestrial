@@ -525,17 +525,63 @@ $("render-btn").addEventListener("click", () => {
 
 // ── Track ────────────────────────────────────────────────────────
 
-async function loadTleSources() {
-  const { sources } = await api("/api/track/sources");
+// Fills the source dropdown, labelling each entry with the age of its saved
+// copy. On first load (initial = true) it also selects the source of the
+// satellites the server already has loaded, and shows them straight away
+// rather than waiting for the first 30s auto-resort.
+async function loadTleSources(initial = false) {
+  const { sources, current, cached_at } = await api("/api/track/sources");
   const select = $("tle-source-select");
+  const selected = initial ? current : select.value;
   select.replaceChildren();
+  const now = Date.now() / 1000;
   sources.forEach((name) => {
     const opt = document.createElement("option");
     opt.value = name;
-    opt.textContent = name;
+    opt.textContent = cached_at[name]
+      ? `${name} · saved ${formatAgo(now - cached_at[name])} ago`
+      : `${name} · not saved yet`;
     select.appendChild(opt);
   });
+  if (selected && sources.includes(selected)) select.value = selected;
+  if (initial && current) {
+    try {
+      const { satellites, ranked } = await api("/api/track/resort", { method: "POST" });
+      renderSatelliteList(satellites, ranked);
+    } catch (e) {
+      /* nothing loaded server-side after all */
+    }
+  }
 }
+
+function showSourceNote(text) {
+  const note = $("source-note");
+  note.textContent = text;
+  note.hidden = !text;
+}
+
+// Picking a source shows its last saved pull - no download. "Pull New
+// Data" is what fetches.
+$("tle-source-select").addEventListener("change", async () => {
+  const source = $("tle-source-select").value;
+  try {
+    const r = await api("/api/track/cached", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ source }),
+    });
+    if (r.cached) {
+      renderSatelliteList(r.satellites, r.ranked);
+      showSourceNote("");
+      refreshStatus();
+    } else {
+      showSourceNote(`No saved data for ${source} yet - click Pull New Data to download it. `
+        + "The list below is still the previous source.");
+    }
+  } catch (e) {
+    showSourceNote("Couldn't load saved data: " + e.message);
+  }
+});
 
 function formatAgo(seconds) {
   if (seconds < 60) return `${Math.floor(seconds)}s`;
@@ -759,7 +805,7 @@ $("load-tles-btn").addEventListener("click", async () => {
   const btn = $("load-tles-btn");
   const requested = $("tle-source-select").value;
   btn.disabled = true;
-  btn.textContent = "Loading…";
+  btn.textContent = "Pulling…";
   try {
     const { satellites, source, ranked, cached_fallback, notices } = await api("/api/track/load", {
       method: "POST",
@@ -767,6 +813,7 @@ $("load-tles-btn").addEventListener("click", async () => {
       body: JSON.stringify({ source: requested }),
     });
     renderSatelliteList(satellites, ranked);
+    showSourceNote("");
     const details = (notices || []).length ? "\n\n" + notices.join("\n") : "";
     if (source !== requested || cached_fallback) {
       $("tle-source-select").value = source;
@@ -779,7 +826,8 @@ $("load-tles-btn").addEventListener("click", async () => {
     alert("Failed to load satellites: " + e.message);
   } finally {
     btn.disabled = false;
-    btn.textContent = "Load Satellites";
+    btn.textContent = "Pull New Data";
+    loadTleSources().catch(() => {});  // refresh the "saved … ago" labels
   }
 });
 
@@ -1281,7 +1329,7 @@ setInterval(refreshStatus, 1500);
 refreshStatus();
 refreshFiles();
 updateEstimate();
-loadTleSources();
+loadTleSources(true);
 loadMotionSettings();
 loadObserver();
 loadTrackSettings();

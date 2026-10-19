@@ -91,10 +91,11 @@
         <div>
           <div class="button-row">
             <select id="tle-source-select"></select>
-            <button id="load-tles-btn">Load Satellites</button>
+            <button id="load-tles-btn" title="Download the latest data for the selected source">Pull New Data</button>
             <button id="resort-tles-btn">Resort</button>
           </div>
           <div id="tle-updated" class="hint">Kepler data: never pulled</div>
+          <div id="source-note" class="hint" hidden></div>
           <div id="rank-note" class="hint" hidden></div>
           <div class="button-row">
             <select id="satellite-select" size="10"></select>

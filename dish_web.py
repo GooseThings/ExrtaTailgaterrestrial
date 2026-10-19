@@ -58,7 +58,8 @@ BAUD_RATE = 9600
 OBSERVER_FILE = "observer_location.json"
 CORRECTION_FILE = "pointing_correction.json"
 TRACK_SETTINGS_FILE = "track_settings.json"
-TLE_CACHE_FILE = "tle_cache.json"
+TLE_CACHE_FILE = "tle_cache.json"  # whichever source was loaded last - restored on startup
+TLE_CACHE_DIR = "tle_cache"         # one file per source
 # Not committed - create it by hand (see README) with your own free
 # space-track.org account. Kept out of the request/response cycle
 # entirely so the credentials never pass through chat/logs.
@@ -133,11 +134,20 @@ def _save_track_settings(min_elevation, max_distance_km, show_constellations):
         }, f)
 
 
-def _load_tle_cache():
-    """Returns (source, fetched_at, sats) from the last successful TLE
-    fetch, or None if there isn't one yet."""
+def _tle_cache_path(source):
+    """Per-source cache file - one per dropdown entry, so switching sources
+    can reuse each one's last pull instead of re-downloading."""
+    slug = re.sub(r"[^a-z0-9]+", "-", source.lower()).strip("-")
+    return os.path.join(TLE_CACHE_DIR, f"{slug}.json")
+
+
+def _load_tle_cache(source=None):
+    """Returns (source, fetched_at, sats) from the last successful fetch of
+    `source`, or of whichever source was loaded last if None. None if
+    there isn't one."""
+    path = TLE_CACHE_FILE if source is None else _tle_cache_path(source)
     try:
-        with open(TLE_CACHE_FILE) as f:
+        with open(path) as f:
             data = json.load(f)
         sats = [(s[0], s[1], s[2]) for s in data["satellites"]]
         return data["source"], float(data["fetched_at"]), sats
@@ -145,13 +155,43 @@ def _load_tle_cache():
         return None
 
 
+def _tle_cache_age(source):
+    """fetched_at of `source`'s cached copy, or None if not cached. Read
+    from the file's mtime (set to fetched_at on save) rather than parsing
+    what can be a multi-megabyte file."""
+    try:
+        return os.path.getmtime(_tle_cache_path(source))
+    except OSError:
+        return None
+
+
+def _write_json(path, data, mtime=None):
+    with open(path + ".tmp", "w") as f:
+        json.dump(data, f)
+    os.replace(path + ".tmp", path)
+    if mtime is not None:
+        os.utime(path, (mtime, mtime))
+
+
 def _save_tle_cache(source, sats, fetched_at):
-    with open(TLE_CACHE_FILE, "w") as f:
-        json.dump({
-            "source": source,
-            "fetched_at": fetched_at,
-            "satellites": [[name, l1, l2] for name, l1, l2 in sats],
-        }, f)
+    """Saves to `source`'s own cache, and as the "last loaded" copy that's
+    restored on startup."""
+    data = {
+        "source": source,
+        "fetched_at": fetched_at,
+        "satellites": [[name, l1, l2] for name, l1, l2 in sats],
+    }
+    os.makedirs(TLE_CACHE_DIR, exist_ok=True)
+    _write_json(_tle_cache_path(source), data, mtime=fetched_at)
+    _write_json(TLE_CACHE_FILE, data)
+
+
+def _migrate_tle_cache():
+    """Caches written before per-source caching only had the single
+    "last loaded" file - give its source its own copy too."""
+    last = _load_tle_cache()
+    if last is not None and _tle_cache_age(last[0]) is None:
+        _save_tle_cache(last[0], last[2], last[1])
 
 # ────────────────────────────────────────────────────────────────
 # SHARED STATE
@@ -237,6 +277,7 @@ state = {
 
 # Preload whatever TLE data was last successfully fetched, so a restart
 # doesn't leave the Track tab empty until the user re-pulls it by hand.
+_migrate_tle_cache()
 _cached_tle = _load_tle_cache()
 if _cached_tle is not None:
     _cached_source, _cached_fetched_at, _cached_sats = _cached_tle
@@ -1306,7 +1347,31 @@ def api_track_sources():
     # shows an option that's guaranteed to fail.
     if _load_space_track_credentials() is not None:
         sources.extend(dish_track.SPACE_TRACK_QUERIES.keys())
-    return jsonify({"sources": sources})
+    with state_lock:
+        current = state["track"]["tle_source"]
+    return jsonify({
+        "sources": sources,
+        "current": current,  # the source of the satellites loaded right now
+        "cached_at": {s: _tle_cache_age(s) for s in sources},
+    })
+
+
+@app.route("/api/track/cached", methods=["POST"])
+def api_track_cached():
+    """Switch to a source's last saved pull without downloading anything."""
+    source = (request.json or {}).get("source")
+    cached = _load_tle_cache(source) if isinstance(source, str) else None
+    if cached is None:
+        return jsonify({"ok": True, "cached": False})
+    _, fetched_at, sats = cached
+    with state_lock:
+        state["track"]["tle_fetched_at"] = fetched_at
+        state["track"]["tle_source"] = source
+        state["all_satellites"] = sats
+    satellites, ranked = _ranked_response(
+        sats, allow_constellations=source in DEDICATED_CONSTELLATION_SOURCES)
+    return jsonify({"ok": True, "cached": True, "source": source, "fetched_at": fetched_at,
+                    "satellites": satellites, "ranked": ranked})
 
 
 def _ranked_response(sats, allow_constellations=False):
@@ -1385,7 +1450,9 @@ def api_track_load():
         # Every live option failed (e.g. no internet at all right now) -
         # fall back to whatever was last successfully pulled rather than
         # leaving the user with nothing.
-        cached = _load_tle_cache()
+        # Prefer the requested source's own last pull over whatever was
+        # loaded last.
+        cached = _load_tle_cache(source) or _load_tle_cache()
         if cached is None:
             print(f"[track/load] {source}: {e}", file=sys.stderr)
             return jsonify({"ok": False, "error": "Could not load satellite data and no local cache is available.\n\n"
