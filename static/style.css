@@ -299,3 +299,6 @@ main > .tab-panel.active { flex: 1; }
 }
 
 #sweep-download { color: var(--accent); font-size: 0.9rem; }
+
+.hint code { word-break: break-all; }
+#tle-source-select { max-width: 100%; }

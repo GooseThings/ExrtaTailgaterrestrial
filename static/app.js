@@ -530,7 +530,8 @@ $("render-btn").addEventListener("click", () => {
 // satellites the server already has loaded, and shows them straight away
 // rather than waiting for the first 30s auto-resort.
 async function loadTleSources(initial = false) {
-  const { sources, current, cached_at } = await api("/api/track/sources");
+  const { sources, current, cached_at, space_track } = await api("/api/track/sources");
+  showSpaceTrackNote(space_track);
   const select = $("tle-source-select");
   const selected = initial ? current : select.value;
   select.replaceChildren();
@@ -552,6 +553,26 @@ async function loadTleSources(initial = false) {
       /* nothing loaded server-side after all */
     }
   }
+}
+
+// Space-Track sources are only listed once a credentials file exists -
+// say so, and where the app looked, instead of leaving them silently absent.
+function showSpaceTrackNote(spaceTrack) {
+  const note = $("space-track-note");
+  note.hidden = !spaceTrack || spaceTrack.available;
+  if (note.hidden) return;
+  const code = (text) => {
+    const c = document.createElement("code");
+    c.textContent = text;
+    return c;
+  };
+  note.replaceChildren(
+    "Space-Track sources are hidden: no valid credentials file at ",
+    code(spaceTrack.credentials_path),
+    ". Create it containing ",
+    code('{"username": "…", "password": "…"}'),
+    " (a free account from space-track.org), then reload this page.",
+  );
 }
 
 function showSourceNote(text) {

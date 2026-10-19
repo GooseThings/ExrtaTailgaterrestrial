@@ -1345,7 +1345,8 @@ def api_track_sources():
     sources = list(dish_track.TLE_SOURCES.keys())
     # Only offered once credentials actually exist, so the dropdown never
     # shows an option that's guaranteed to fail.
-    if _load_space_track_credentials() is not None:
+    space_track_ok = _load_space_track_credentials() is not None
+    if space_track_ok:
         sources.extend(dish_track.SPACE_TRACK_QUERIES.keys())
     with state_lock:
         current = state["track"]["tle_source"]
@@ -1353,6 +1354,13 @@ def api_track_sources():
         "sources": sources,
         "current": current,  # the source of the satellites loaded right now
         "cached_at": {s: _tle_cache_age(s) for s in sources},
+        # Where the file is looked for, so the page can say why Space-Track
+        # is missing - this depends on the directory the app runs from
+        # (~/.local/share/extratailgaterrestrial for the installed app).
+        "space_track": {
+            "available": space_track_ok,
+            "credentials_path": os.path.abspath(SPACE_TRACK_CREDENTIALS_FILE),
+        },
     })
 
 
