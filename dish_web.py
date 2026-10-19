@@ -242,6 +242,8 @@ state = {
         "error": None,
     },
 
+    "move_stop": None,  # set while a Manual-tab /api/move runs
+
     "sweep_thread": None,
     "sweep_stop": None,
     "sweep": {
@@ -363,9 +365,33 @@ def _safe_move(dish, axis, target_deg, cancel_event=None):
         force=unknown, cancel_event=cancel_event,
     )
 
+    if cancel_event is not None and cancel_event.is_set():
+        # Stopped part-way - stepped_move returns the target, not where
+        # the dish actually is.
+        _invalidate_position(axis)
+        return None
     with state_lock:
         state["motion"]["position"][axis] = achieved
     return achieved
+
+
+def _direct_move(dish, axis, target_deg, cancel_event=None):
+    """One continuous closed-loop move straight to target_deg - no
+    chunking, so no pauses, but no mid-move slip check either."""
+    with state_lock:
+        tolerance = state["motion"]["tolerance"]
+    if axis == 'az':
+        target_deg %= 360
+    else:
+        target_deg = max(dish_motion.MIN_ELEVATION, min(dish_motion.MAX_ELEVATION, target_deg))
+    dish_motion.move_to(dish, axis, target_deg, tolerance=tolerance,
+                        on_warning=_record_motion_warning, cancel_event=cancel_event)
+    if cancel_event is not None and cancel_event.is_set():
+        _invalidate_position(axis)
+        return None
+    with state_lock:
+        state["motion"]["position"][axis] = target_deg
+    return target_deg
 
 
 def _verify_position(dish, axis, expected_deg, cancel_event=None):
@@ -460,14 +486,22 @@ def api_motion_clear():
 
 @app.route("/api/move", methods=["POST"])
 def api_move():
+    """Move one axis. mode "stepped" (default) moves in verified Step-size
+    chunks; "continuous" is one uninterrupted move. Either can be cut short
+    with /api/move/stop, which returns cancelled: true."""
     p = request.json or {}
     axis = p.get("axis")
     if axis not in ("az", "el"):
         return jsonify({"ok": False, "error": "axis must be 'az' or 'el'"}), 400
+    mode = p.get("mode", "stepped")
+    if mode not in ("stepped", "continuous"):
+        return jsonify({"ok": False, "error": "mode must be 'stepped' or 'continuous'"}), 400
     try:
         target = float(p["degrees"])
     except (KeyError, ValueError, TypeError):
         return jsonify({"ok": False, "error": "degrees required"}), 400
+    if not math.isfinite(target):
+        return jsonify({"ok": False, "error": "degrees must be a finite number"}), 400
 
     with state_lock:
         dish = state["dish"]
@@ -476,11 +510,29 @@ def api_move():
 
     if not dish_io_lock.acquire(blocking=False):
         return jsonify({"ok": False, "error": "Dish is busy with another operation."}), 409
+    stop_event = threading.Event()
+    with state_lock:
+        state["move_stop"] = stop_event
     try:
-        achieved = _safe_move(dish, axis, target)
+        move = _direct_move if mode == "continuous" else _safe_move
+        achieved = move(dish, axis, target, cancel_event=stop_event)
     finally:
+        with state_lock:
+            state["move_stop"] = None
         dish_io_lock.release()
+    if stop_event.is_set():
+        return jsonify({"ok": True, "cancelled": True})
     return jsonify({"ok": True, "target_deg": achieved})
+
+
+@app.route("/api/move/stop", methods=["POST"])
+def api_move_stop():
+    """Stops a Manual-tab move in progress, halting the motor where it is."""
+    with state_lock:
+        stop_event = state["move_stop"]
+    if stop_event:
+        stop_event.set()
+    return jsonify({"ok": True, "stopping": stop_event is not None})
 
 
 _clock_cache = {"result": None, "at": 0.0}
@@ -589,6 +641,10 @@ def _run_sweep(dish, points, stop_event):
                     state["motion"]["position"]["el"] = el
         with state_lock:
             state["sweep"]["last_file"] = out_file
+        if stop_event.is_set():
+            # A Stop can halt the dish part-way through a hop.
+            _invalidate_position('az')
+            _invalidate_position('el')
     except Exception as e:
         with state_lock:
             state["sweep"]["error"] = str(e)

@@ -194,6 +194,7 @@ function createLineChart(container, opts) {
 let signalPeak = 0;
 let signalPolling = false;
 let manualMoving = false;
+let manualStopRequested = false;
 
 // Live signal chart: the last LIVE_WINDOW seconds of readings, from the
 // idle poll below or, during a sweep, from the sweep's own readings.
@@ -230,24 +231,45 @@ $("manual-go-btn").addEventListener("click", async () => {
     return;
   }
   const btn = $("manual-go-btn");
+  const mode = $("manual-mode").value;
   manualMoving = true;
+  manualStopRequested = false;
   btn.disabled = true;
-  status.textContent = "Moving…";
+  $("manual-stop-btn").disabled = false;
   try {
     const post = (axis, degrees) => api("/api/move", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ axis, degrees }),
+      body: JSON.stringify({ axis, degrees, mode }),
     });
-    await post("az", az);
-    await post("el", el);
-    status.textContent = `Arrived at az ${az}°, el ${el}°.`;
+    let cancelled = false;
+    for (const [axis, degrees] of [["az", az], ["el", el]]) {
+      // A Stop between the two axis moves skips the second one.
+      if (manualStopRequested) { cancelled = true; break; }
+      status.textContent = `Moving ${axis} to ${degrees}°…`;
+      if ((await post(axis, degrees)).cancelled) { cancelled = true; break; }
+    }
+    status.textContent = cancelled
+      ? "Stopped. Position is unknown until the next move."
+      : `Arrived at az ${az}°, el ${el}°.`;
   } catch (e) {
     status.textContent = "Move failed: " + e.message;
   }
   manualMoving = false;
   btn.disabled = false;
+  $("manual-stop-btn").disabled = true;
   refreshStatus();
+});
+
+$("manual-stop-btn").addEventListener("click", async () => {
+  manualStopRequested = true;
+  $("manual-stop-btn").disabled = true;
+  $("manual-status").textContent = "Stopping…";
+  try {
+    await api("/api/move/stop", { method: "POST" });
+  } catch (e) {
+    /* the move request itself reports the outcome */
+  }
 });
 
 $("signal-reset-btn").addEventListener("click", () => {

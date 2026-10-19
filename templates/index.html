@@ -220,8 +220,20 @@
           <label>Elevation (°, 5–70)
             <input type="number" id="manual-el" value="45" min="5" max="70" step="0.1">
           </label>
+          <label>Movement
+            <select id="manual-mode">
+              <option value="stepped">Stepped (checked every Step size)</option>
+              <option value="continuous">Continuous (one smooth move)</option>
+            </select>
+          </label>
+          <p class="hint">
+            Stepped pauses after each Step-size chunk to check the dish hasn't slipped. Continuous
+            goes straight there without pausing, but a slip on a long move isn't caught until the end.
+            Either way, az moves first, then el.
+          </p>
           <div class="button-row">
             <button id="manual-go-btn" disabled>Go</button>
+            <button id="manual-stop-btn" disabled>Stop</button>
           </div>
           <div id="manual-status" class="hint"></div>
         </div>

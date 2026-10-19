@@ -12,6 +12,7 @@
 # firmware's own azangle table is broken between 200 and 212 deg (201 maps
 # *below* 200, then jumps 127 counts at 212) - see docs/FIRMWARE.md.
 
+import contextlib
 import re
 import time
 
@@ -69,9 +70,17 @@ def _send(dish, text):
     dish.flush()
 
 
-def _read(dish, settle):
-    time.sleep(settle)
-    return dish.read(2000).decode(errors='replace')
+def _read_reply(dish, limit=1.5):
+    """Read a command's reply up to the firmware's GO> prompt. The prompt
+    usually arrives within ~50ms, so this returns then instead of after a
+    fixed sleep plus a full port read timeout (which made every move and
+    query take 1.3-1.5s of mostly waiting). `limit` caps a missing prompt."""
+    buf = ''
+    deadline = time.time() + limit
+    with _short_reads(dish):
+        while time.time() < deadline and 'GO>' not in buf:
+            buf += dish.read(256).decode(errors='replace')
+    return buf
 
 
 def _wait_stopped(dish, axis, cancel_event, already_read=''):
@@ -84,13 +93,26 @@ def _wait_stopped(dish, axis, cancel_event, already_read=''):
     label = 'Az' if axis == 'az' else 'El'
     buf = already_read
     deadline = time.time() + MOVE_TIMEOUT
-    while time.time() < deadline:
-        if f'Stopped at {label}:' in buf:
-            return True
-        if _cancelled(cancel_event):
-            return False
-        buf += dish.read(256).decode(errors='replace')
+    with _short_reads(dish):  # so a Stop is noticed within ~50ms
+        while time.time() < deadline:
+            if f'Stopped at {label}:' in buf:
+                return True
+            if _cancelled(cancel_event):
+                return False
+            buf += dish.read(256).decode(errors='replace')
     return f'Stopped at {label}:' in buf
+
+
+@contextlib.contextmanager
+def _short_reads(dish, timeout=0.05):
+    """Temporarily make dish.read() give up after `timeout` instead of the
+    port's usual (up to 1s) timeout, for loops that poll between reads."""
+    old = dish.timeout
+    dish.timeout = timeout
+    try:
+        yield
+    finally:
+        dish.timeout = old
 
 
 def _move_and_check(dish, axis, deg, cancel_event):
@@ -101,26 +123,36 @@ def _move_and_check(dish, axis, deg, cancel_event):
     cmd, target = move_command(axis, deg)
     dish.reset_input_buffer()
     _send(dish, cmd)
-    ack = _read(dish, 0.3)
+    ack = _read_reply(dish)
     m = re.search(r'target:\s*(\d+)', ack)
     if not m or int(m.group(1)) != target:
-        # A new move preempts the old one, so re-commanding the current
-        # position cancels a garbled target before it travels far.
-        _send(dish, 'azim' if axis == 'az' else 'elev')
-        current = _read(dish, 0.3)
-        c = re.search(r':\s*(\d+)', current)
-        if c:
-            _send(dish, f"{'azim' if axis == 'az' else 'elev'} {int(c.group(1))}")
+        halt(dish, axis)  # cancel a garbled target before it travels far
         return None, None
-    _wait_stopped(dish, axis, cancel_event, already_read=ack)
+    if not _wait_stopped(dish, axis, cancel_event, already_read=ack) and _cancelled(cancel_event):
+        # Cancelling only stops our waiting - the motor would carry on to
+        # the target, so actually stop it.
+        halt(dish, axis)
+        return None, None
     raw = _query_raw(dish, 'azim' if axis == 'az' else 'elev')
     return target, raw
+
+
+def halt(dish, axis):
+    """Stop `axis` where it is now. The firmware has no stop command, but
+    any new move preempts the one in progress, so this re-targets the
+    current raw position. Returns that position (None if unreadable, in
+    which case the move couldn't be stopped)."""
+    query = 'azim' if axis == 'az' else 'elev'
+    current = _query_raw(dish, query)
+    if current is not None:
+        _send(dish, f"{query} {current}")
+    return current
 
 
 def _query_raw(dish, query_cmd):
     dish.reset_input_buffer()
     _send(dish, query_cmd)
-    reply = _read(dish, 0.5)
+    reply = _read_reply(dish)
     for line in reply.splitlines():
         if ':' in line:
             try:

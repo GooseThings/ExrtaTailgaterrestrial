@@ -202,7 +202,7 @@ main > .tab-panel.active { flex: 1; }
   margin-bottom: 8px;
 }
 
-.stats-box label input { width: 100%; margin-top: 4px; }
+.stats-box label input, .stats-box label select { width: 100%; margin-top: 4px; }
 .stats-box label:last-child { margin-bottom: 0; }
 
 /* Inline controls (e.g. Saved scans' Interpolation) stay inline in a button row. */
